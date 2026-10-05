@@ -1,6 +1,6 @@
 # bXVzaVM
 
-A portable, personal music terminal app. Version **0.4.0** adds song-name catalog search and a prefilled DoubleDouble handoff. Safe ZIP/folder import, review, recoverable acceptance, and Docker runtime are available. Local indexing, fuzzy song lookup, favorites, and background mpv playback are available. The TUI uses text labels, square panels, and muted Gruvbox colors. Animation is disabled; the Windows tray uses a small static monochrome `b`. `bxvzm` is the Python package and command alias.
+A portable, personal music terminal app. Version **0.4.1** makes Amazon Music the default browser search, adds a copied-link handoff on Windows, and simplifies Imports and navigation. Safe ZIP/folder import, review, recoverable acceptance, and Docker runtime are available. Local indexing, fuzzy song lookup, favorites, and background mpv playback are available. The TUI uses text labels, square panels, and muted Gruvbox colors. Animation is disabled; the Windows tray uses a small static monochrome `b`. `bxvzm` is the Python package and command alias.
 
 ## Install and run
 
@@ -51,28 +51,25 @@ Scanning accepts MP3, FLAC, M4A/AAC, OGG/Opus, and WAV. It reads local tags, dur
 
 ## Download and import music
 
-In **Search** (`2`), type a song name and optionally its artist, then press Enter or **Search songs**. The app searches Deezer's public catalog and displays up to 20 results with title, artist, album, and the provider's track-level explicit flag (missing flags stay unknown). Select the correct album/edition; Enter on a result or **Use album link** fills the download-link field. **Use track link** selects the individual song instead. Open **DoubleDouble** and its URL input is already filled; handle CAPTCHA and start the download in the browser. You do not need to find or paste a link for catalog results.
-
-CLI discovery is separate from local playback:
+In **Search** (`2`), type the song and artist, then choose **Search Amazon** or press Enter. Amazon Music opens in your browser. Choose the album/edition there and copy its direct album link with **Share / Copy link**. Back in the native Windows TUI, choose **Use copied link**, then **Open DoubleDouble**. The app reads that link only when requested and fills DoubleDouble's URL input. Complete CAPTCHA and the download in your browser.
 
 ```sh
-bxvzm --search "Circles Post Malone"
-bxvzm --search "Circles Post Malone" --result 1 --open-browser
-bxvzm --search "Circles Post Malone" --result 1 --track-link --open-browser
+bxvzm --search "Circles Post Malone" --open-browser
+bxvzm --download-copied --open-browser
 bxvzm --song "cirle"
 ```
 
-`--result N` chooses from a fresh search response; review the printed title/artist/album and browser page before downloading. Album links are the default. `--song` searches and plays indexed local audio; it does not search online or download a missing song. Search runs only when submitted, in a worker, with a ten-second HTTP timeout and a 2 MiB decoded-response limit. Offline/error/empty states leave local playback usable. Catalog metadata remains separate from imported-file metadata and does not establish album completeness or clean/explicit status for imported files. Full pagination, MusicBrainz reference lookup and edition verification remain upcoming.
+Amazon is now the default source. This is browser-assisted selection, not automatic Amazon catalog results: the [official catalog API](https://www.developer.amazon.com/docs/music/API_web_overview_v2.html) needs approved developer access. The public browser HTML does not include query results for the app to read. The app does not substitute a Deezer URL for an Amazon search. Browser search and copied links have been tested with mocks; selecting/sharing an album in the live Amazon browser has not been manually verified. An explicit `--provider deezer` retains the earlier optional public catalog CLI, with `--result N` and `--track-link`; those options require that provider. `--song` searches and plays indexed local music only.
 
-Amazon Music in-app catalog search is not implemented: its [official API](https://www.developer.amazon.com/docs/music/API_web_overview_v2.html) is in closed beta and needs approved developer access and authentication. Amazon is not silently searched through private endpoints. You can still paste a direct Amazon Music, TIDAL, or Deezer HTTPS album/track URL and open a prefilled DoubleDouble page. No service is substituted for a pasted Amazon link. Shortened links and other hosts are rejected. The public `?url=` handoff fills the input; the app does not submit downloads or automate CAPTCHA. DoubleDouble's [FAQ](https://us.doubledouble.top/faq/) describes the lack of a download API.
+Clipboard reading is available on native Windows. Linux/macOS and Docker users can paste a direct Amazon album/track URL into Search or use `--download URL`; containers print links to open on the host. Clipboard contents are not monitored. Shortened links, unrelated clipboard text, and non-Amazon copied links are rejected. Direct pasted Deezer/TIDAL links remain supported when chosen explicitly. The public DoubleDouble `?url=` handoff fills the input without submitting a download; its [FAQ](https://us.doubledouble.top/faq/) explains the lack of a download API.
 
-In **Imports** (`5`), enter the downloaded ZIP, audio file, or folder path and choose **Stage files**. Review the full file list, local tags, disc/track numbers, formats, duplicate count, and any errors. **Accept unverified** copies the original bytes into a separate import folder and indexes them. **Discard staged** removes only that job's staging copies. Source files remain untouched.
+In **Imports** (`5`), paste the path to the downloaded ZIP, audio file or folder and choose **Review files**. This prepares review copies only; nothing is added to the library yet. Read the file count and problems, expand **Files in this download** to inspect title/artist/disc/track/format and original names, then tick **I checked these files; add without album verification** and choose **Add to library**. File problems block adding. **Cancel review** removes review copies and preserves the original download. Previous downloads and their readable statuses are in a separate expandable section. The optional album link is entered explicitly for this download, rather than being copied silently from Search. Progress/errors appear separately from the review summary. Album completeness, edition, and imported clean/explicit status remain unverified.
 
 The same flow works from the CLI (replace `JOB` with the full ID printed when staging):
 
 ```sh
-bxvzm --download "https://www.deezer.com/album/123" --open-browser
-bxvzm --import "path/to/download.zip" --source-url "https://www.deezer.com/album/123"
+bxvzm --download "https://music.amazon.com/albums/B07X3R97JH" --open-browser
+bxvzm --import "path/to/download.zip" --source-url "https://music.amazon.com/albums/B07X3R97JH"
 bxvzm --imports
 bxvzm --review-import JOB
 bxvzm --accept-import JOB --accept-unverified
@@ -107,7 +104,7 @@ docker compose -f docker/compose.yaml exec -T app bxvzm --song "circle"
 docker compose -f docker/compose.yaml down
 ```
 
-On Linux/macOS, `sh docker/bxvzm.sh open tui` provides the same wrapper. For a **native Linux Docker host** with ALSA devices, add `-f docker/compose.audio.yaml` to the direct Compose commands to expose `/dev/snd`. This optional audio configuration has not been tested on a Linux audio device. Docker Desktop Windows/macOS does not gain sound from that override. Browser opening is done on the host; in a container use `--search QUERY --result N` or `--download URL` and open the printed prefilled DoubleDouble URL manually. Clipboard forwarding on Unix/container terminals depends on terminal OSC 52 support.
+On Linux/macOS, `sh docker/bxvzm.sh open tui` provides the same wrapper. For a **native Linux Docker host** with ALSA devices, add `-f docker/compose.audio.yaml` to the direct Compose commands to expose `/dev/snd`. This optional audio configuration has not been tested on a Linux audio device. Docker Desktop Windows/macOS does not gain sound from that override. Browser opening is done on the host; `--search QUERY` prints an Amazon search URL, and `--download URL` prints a prefilled DoubleDouble URL. Open those on the host. Clipboard forwarding on Unix/container terminals depends on terminal OSC 52 support.
 
 The bind mount exposes only this bundle's `data/`. Container settings use `data/container-config.json` and a separate `data/container-library` to avoid conflicting with a native daemon. Place downloaded files in `data/downloads/` and import using `/app/data/downloads/...`. Container paths are Linux paths. No service ports are published. Do not run two daemons against the same library across the host and container.
 
@@ -134,7 +131,7 @@ Typing in the filter takes precedence over shortcuts. The player bar follows CLI
 
 This is a per-user background process, with no administrator-level Windows Service or login-startup registration. Windows tray behavior is the initial target. Linux/macOS use a background process without a tray; their native audio playback has not been accepted yet.
 
-Playlist/queue editing, shuffle/repeat, reference-verified imports, export, and backup remain upcoming. Search provides Deezer song-name discovery and prefilled handoff; Imports provides staging and explicit unverified acceptance.
+Playlist/queue editing, shuffle/repeat, reference-verified imports, export, and backup remain upcoming. Search provides Amazon browser discovery and copied-link handoff; Imports provides guided review and explicit acceptance without album verification.
 
 ## Portable storage
 
@@ -163,7 +160,8 @@ All application storage stays inside ignored `data/`. Settings and indexed paths
 | --- | --- |
 | `src/bxvzm/cli.py` | Command arguments and dispatch |
 | `src/bxvzm/ui/` | Main TUI, catalog search, download/import panels |
-| `src/bxvzm/catalog/deezer.py` | Public provider metadata lookup and bounded responses |
+| `src/bxvzm/catalog/deezer.py` | Optional Deezer CLI metadata lookup and bounded responses |
+| `src/bxvzm/catalog/amazon.py`, `transfers/clipboard.py` | Amazon browser search and explicit Windows copied-link reading |
 | `src/bxvzm/transfers/links.py` | Provider URL validation and browser handoff |
 | `src/bxvzm/transfers/imports.py` | Bounded staging, hashes, acceptance and recovery |
 | `src/bxvzm/database.py` | SQLite migrations, jobs/history, index transactions |
@@ -174,4 +172,4 @@ All application storage stays inside ignored `data/`. Settings and indexed paths
 
 For import failures, use `--imports` and `--review-import JOB` to inspect the saved state, full file evidence, hashes, and error. Staged copies are in the selected library's `.staging/JOB/`; accepted audio is in `music/Imported [unverified-JOB]/`. Keep an interrupted acceptance's files and repeat acceptance to resume. Service startup diagnostics are in `.service.log`; `--status` checks connectivity. For containers, use `docker compose -f docker/compose.yaml logs app`. All application diagnostics and state remain inside `data/`.
 
-Tests, development tools, screenshots, and the Docker checks target/service live on [dev](https://github.com/bWFyY28/bXVzaWM/tree/dev). Main ships the runtime image and launchers only. Native Windows tray and silent-audio playback smoke checks pass; audible output and visible tray-menu interaction need human verification. Container Unix IPC was checked with null audio; audible container playback and Linux ALSA passthrough are unverified.
+Tests, development tools, screenshots, and the Docker checks target/service live on [dev](https://github.com/bWFyY28/bXVzaWM/tree/dev). Main ships the runtime image and launchers only. Native silent-audio/tray smoke checks pass; audible output and visible tray-menu interaction need human verification. Container IPC was checked with null audio; audible container playback and ALSA passthrough are unverified.

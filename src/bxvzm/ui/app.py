@@ -97,21 +97,21 @@ class MusicApp(App[None]):
     def compose(self) -> ComposeResult:
         yield Static("bXVzaVM | Local music", id="title")
         with TabbedContent(initial="library", id="views"):
-            with TabPane("Library", id="library"):
+            with TabPane("1 Library", id="library"):
                 yield Input(placeholder="Filter title, artist, album, or path", id="filter")
                 yield DataTable(id="tracks", cursor_type="row", zebra_stripes=False)
                 yield Static("Copy audio into music/, then press r to scan.", id="library-status")
                 yield Static(str(self.layout.music), id="library-root", markup=False)
-            with TabPane("Search", id="search"):
+            with TabPane("2 Search", id="search"):
                 yield CatalogPanel()
-            with TabPane("Favorites", id="favorites"):
+            with TabPane("3 Favorites", id="favorites"):
                 yield DataTable(id="favorite-tracks", cursor_type="row", zebra_stripes=False)
                 yield Static(
                     "Press f on a track to add or remove a favorite.", classes="empty-state"
                 )
-            with TabPane("Playlists", id="playlists"):
+            with TabPane("4 Playlists", id="playlists"):
                 yield Static("Playlist editing is upcoming.", classes="empty-state")
-            with TabPane("Imports", id="imports"):
+            with TabPane("5 Imports", id="imports"):
                 yield ImportPanel(self.store)
         yield Static("Stopped | No track loaded | Enter Play / Space Pause", id="player")
         yield Footer()

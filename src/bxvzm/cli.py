@@ -31,13 +31,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     actions = parser.add_mutually_exclusive_group()
     actions.add_argument("--song", metavar="QUERY", help="fuzzy-find and play a local song")
-    actions.add_argument("--search", metavar="QUERY", help="search Deezer songs by name/artist")
+    actions.add_argument(
+        "--search", metavar="QUERY", help="find a song on Amazon Music in your browser"
+    )
     actions.add_argument("--daemon", action="store_true", help="start the background tray service")
     actions.add_argument("--status", action="store_true", help="show background playback status")
     actions.add_argument("--stop-service", action="store_true", help="exit the background service")
     actions.add_argument("--pause", action="store_true", help="toggle background play/pause")
     actions.add_argument("--serve", action="store_true", help=argparse.SUPPRESS)
     actions.add_argument("--download", metavar="URL", help="prepare a manual DoubleDouble handoff")
+    actions.add_argument(
+        "--download-copied",
+        action="store_true",
+        help="use a copied Amazon Music link (native Windows)",
+    )
     actions.add_argument(
         "--import",
         dest="import_source",
@@ -67,6 +74,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--match", type=int, metavar="N", help="play candidate N for --song")
     parser.add_argument("--result", type=int, metavar="N", help="select result N with --search")
     parser.add_argument(
+        "--provider", choices=("amazon", "deezer"), help="search source; default: amazon (browser)"
+    )
+    parser.add_argument(
         "--track-link", action="store_true", help="use the selected track rather than its album"
     )
     return parser
@@ -80,6 +90,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     transfer_action = any(
         (
             args.download is not None,
+            args.download_copied,
             args.search is not None,
             args.import_source is not None,
             args.imports,
@@ -94,12 +105,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         build_parser().error("use 'open tui' without another action")
     if (args.check or args.scan) and (service_action or transfer_action):
         build_parser().error("--check/--scan cannot be combined with other actions")
+    provider = args.provider or "amazon"
+    if args.provider and args.search is None:
+        build_parser().error("--provider requires --search")
+    if provider == "amazon" and (args.result is not None or args.track_link):
+        build_parser().error(
+            "Amazon search uses your browser; --result/--track-link require --provider deezer"
+        )
     if (
         args.open_browser
         and args.download is None
-        and not (args.search is not None and args.result is not None)
+        and not args.download_copied
+        and not (args.search is not None and (provider == "amazon" or args.result is not None))
     ):
-        build_parser().error("--open-browser requires --download or --search with --result")
+        build_parser().error("--open-browser requires a download link or selected search")
     if args.result is not None and (args.search is None or not 1 <= args.result <= 20):
         build_parser().error("--result requires --search and a number from 1 to 20")
     if args.track_link and (args.search is None or args.result is None):
@@ -129,7 +148,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                 validate_provider_url,
             )
 
-            if args.search is not None:
+            if args.search is not None and provider == "amazon":
+                from bxvzm.catalog.amazon import open_search, search_url
+
+                print(
+                    f"Amazon Music search: {search_url(args.search)}\n"
+                    "Choose an album in the browser and copy its Share link.\n"
+                    "Then: bxvzm --download-copied --open-browser (native Windows).\n"
+                    "Automatic Amazon catalog results need approved API access."
+                )
+                if args.open_browser:
+                    open_search(args.search)
+            elif args.search is not None:
                 from bxvzm.catalog.deezer import search_songs
 
                 songs = search_songs(args.search)
@@ -146,7 +176,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                             f"| Deezer | Explicit (track): {status}\nAlbum: {song.album_url}"
                         )
                     print(
-                        "Choose with --search QUERY --result N; "
+                        "Choose with --provider deezer --search QUERY --result N; "
                         "add --open-browser for the prefilled handoff."
                     )
                     return 0
@@ -163,8 +193,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
                 if args.open_browser:
                     open_download_page(link)
-            elif args.download is not None:
-                link = validate_provider_url(args.download)
+            elif args.download is not None or args.download_copied:
+                if args.download_copied:
+                    from bxvzm.transfers.clipboard import copied_amazon_link
+
+                    link = copied_amazon_link()
+                else:
+                    link = validate_provider_url(args.download)
                 print(
                     f"{link.provider} {link.kind}: {link.url}\n"
                     f"Open {download_page_url(link)}; its URL input is prefilled.\n"
