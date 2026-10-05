@@ -17,7 +17,7 @@ HAS_TEXTUAL = importlib.util.find_spec("textual") is not None
 @unittest.skipUnless(HAS_TEXTUAL, "Install locked dependencies to run Textual checks")
 class InterfaceTests(unittest.IsolatedAsyncioTestCase):
     async def test_navigation_help_and_layout_at_80_by_24(self) -> None:
-        from textual.widgets import Static, TabbedContent
+        from textual.widgets import Static, Tab, TabbedContent
 
         from bxvzm.ui import HelpScreen, MusicApp
 
@@ -28,6 +28,8 @@ class InterfaceTests(unittest.IsolatedAsyncioTestCase):
             app = MusicApp(layout)
             async with app.run_test(size=(80, 24)) as pilot:
                 self.assertEqual(app.query_one(TabbedContent).active, "library")
+                widths = [tab.region.width for tab in app.query(Tab)]
+                self.assertLessEqual(max(widths) - min(widths), 1)
                 for key, view in (
                     ("2", "search"),
                     ("3", "favorites"),

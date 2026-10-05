@@ -141,25 +141,51 @@ class CatalogTests(unittest.TestCase):
             patch("bxvzm.transfers.links.webbrowser.open", return_value=True) as browser,
         ):
             with redirect_stdout(io.StringIO()) as output:
-                self.assertEqual(main(["--search", "circle post malone"]), 0)
+                self.assertEqual(
+                    main(["--provider", "deezer", "--search", "circle post malone"]), 0
+                )
                 self.assertIn("Post Malone", output.getvalue())
                 self.assertIn("Explicit (track): unknown", output.getvalue())
             browser.assert_not_called()
             with redirect_stdout(io.StringIO()):
                 self.assertEqual(
-                    main(["--search", "circle post malone", "--result", "1", "--open-browser"]), 0
+                    main(
+                        [
+                            "--provider",
+                            "deezer",
+                            "--search",
+                            "circle post malone",
+                            "--result",
+                            "1",
+                            "--open-browser",
+                        ]
+                    ),
+                    0,
                 )
             self.assertEqual(
                 parse_qs(urlsplit(browser.call_args.args[0]).query)["url"], [song.album_url]
             )
             with redirect_stdout(io.StringIO()):
                 self.assertEqual(
-                    main(["--search", "circle", "--result", "1", "--track-link", "--open-browser"]),
+                    main(
+                        [
+                            "--provider",
+                            "deezer",
+                            "--search",
+                            "circle",
+                            "--result",
+                            "1",
+                            "--track-link",
+                            "--open-browser",
+                        ]
+                    ),
                     0,
                 )
             self.assertEqual(
                 parse_qs(urlsplit(browser.call_args.args[0]).query)["url"], [song.track_url]
             )
             with redirect_stderr(io.StringIO()):
-                self.assertEqual(main(["--search", "circle", "--result", "2"]), 1)
+                self.assertEqual(
+                    main(["--provider", "deezer", "--search", "circle", "--result", "2"]), 1
+                )
         player.assert_not_called()

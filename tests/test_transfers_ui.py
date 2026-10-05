@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from helpers import write_wave
-from textual.widgets import Button, DataTable, Input, Static
+from textual.widgets import Button, Checkbox, DataTable, Input, Static
 
 from bxvzm.library import LibraryLayout
 from bxvzm.transfers.imports import stage_import
@@ -43,9 +43,18 @@ class TransferInterfaceTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(jobs[0]["state"], "review")
                 self.assertEqual(app.store.list_tracks(), [])
                 self.assertIn(
-                    "Completeness: unknown", str(app.query_one("#import-detail", Static).content)
+                    "have not been checked", str(app.query_one("#import-detail", Static).content)
                 )
-                table = app.query_one("#import-jobs", DataTable)
+                self.assertTrue(app.query_one("#accept-import", Button).disabled)
+                self.assertFalse(jobs[0]["manifest"]["provider_url"])
+                self.assertEqual(app.query_one("#import-files", DataTable).row_count, 1)
+                self.assertLessEqual(
+                    app.query_one("#accept-import", Button).region.bottom,
+                    app.query_one(ImportPanel).region.bottom,
+                )
+                table = app.query_one("#import-files", DataTable)
+                table.scroll_visible(animate=False)
+                await pilot.pause()
                 table.focus()
                 with (
                     patch.object(app, "_send_player") as player,
@@ -54,8 +63,15 @@ class TransferInterfaceTests(unittest.IsolatedAsyncioTestCase):
                     await pilot.press("enter", "f")
                 player.assert_not_called()
                 library.assert_not_called()
+                confirm = app.query_one("#confirm-import", Checkbox)
+                confirm.scroll_visible(animate=False)
+                await pilot.pause()
+                await pilot.click("#confirm-import")
+                await pilot.pause()
+                self.assertFalse(app.query_one("#accept-import", Button).disabled)
                 if screenshot_directory := os.environ.get("BXVZM_SCREENSHOT_DIR"):
                     app.query_one("#import-path", Input).value = "data/downloads/song.wav"
+                    app.query_one(ImportPanel).scroll_home(animate=False)
                     await pilot.pause()
                     screenshot = app.export_screenshot()
                     screenshot = re.sub(r"@font-face\s*\{.*?\}", "", screenshot, flags=re.S)
@@ -104,4 +120,34 @@ class TransferInterfaceTests(unittest.IsolatedAsyncioTestCase):
                 await app.workers.wait_for_complete()
                 await pilot.pause()
                 self.assertFalse(app.query_one("#stage-import", Button).disabled)
-                self.assertIn("existing file", str(app.query_one("#import-detail", Static).content))
+                self.assertIn("existing file", str(app.query_one("#import-status", Static).content))
+
+    async def test_file_problems_block_adding_and_new_review_resets_confirmation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            source = base / "downloads"
+            write_wave(source / "good.wav")
+            (source / "bad.wav").write_bytes(b"not audio")
+            app = MusicApp(LibraryLayout.at(base / "data/library", base))
+            async with app.run_test(size=(80, 24)) as pilot:
+                await app.workers.wait_for_complete()
+                await pilot.press("5")
+                app.query_one("#import-path", Input).value = str(source)
+                await pilot.click("#stage-import")
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertIn(
+                    "Adding is blocked", str(app.query_one("#import-detail", Static).content)
+                )
+                self.assertTrue(app.query_one("#confirm-import", Checkbox).disabled)
+                self.assertTrue(app.query_one("#accept-import", Button).disabled)
+                app.query_one("#import-path", Input).value = str(source / "good.wav")
+                app.query_one("#import-path", Input).scroll_visible(animate=False)
+                await pilot.pause()
+                await pilot.click("#stage-import")
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertFalse(app.query_one("#confirm-import", Checkbox).disabled)
+                self.assertFalse(app.query_one("#confirm-import", Checkbox).value)
+                self.assertTrue(app.query_one("#accept-import", Button).disabled)
+                self.assertEqual(app.store.list_tracks(), [])
