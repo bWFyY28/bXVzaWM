@@ -72,7 +72,6 @@ def prepare_venv(root: Path, env: dict[str, str], recreate: bool = False) -> Pat
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Install bXVzaVM inside this folder")
-    parser.add_argument("--dev", action="store_true", help="also install pytest and Ruff")
     parser.add_argument("--recreate", action="store_true", help="rebuild .venv, preserving data/")
     args = parser.parse_args(argv)
     if sys.version_info[:2] != (3, 13):
@@ -82,11 +81,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         env = setup_environment(root)
         executable = prepare_venv(root, env, args.recreate)
-        requirements = (
-            ["-r", "requirements/dev.txt"]
-            if args.dev
-            else ["-r", "requirements/runtime.txt", "-r", "requirements/build.txt"]
-        )
+        requirements = ["-r", "requirements/runtime.txt", "-r", "requirements/build.txt"]
         commands = (
             ["-m", "pip", "install", *requirements],
             [
@@ -96,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
                 "--no-deps",
                 "--no-build-isolation",
                 "-e",
-                ".[dev]" if args.dev else ".",
+                ".",
             ],
             ["-m", "pip", "check"],
             ["-m", "bxvzm", "--check"],
