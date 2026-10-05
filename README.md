@@ -1,6 +1,6 @@
 # bXVzaVM
 
-A portable, personal music terminal app. Version **0.3.0** adds manual music download handoff, safe ZIP/folder import and review, recoverable acceptance, and a complete Docker app build. Local indexing, fuzzy song lookup, favorites, and background mpv playback are available. The TUI uses text labels, square panels, and muted Gruvbox colors. Animation is disabled; the Windows tray uses a small static monochrome `b`. `bxvzm` is the Python package and command alias.
+A portable, personal music terminal app. Version **0.4.0** adds song-name catalog search and a prefilled DoubleDouble handoff. Safe ZIP/folder import, review, recoverable acceptance, and Docker runtime are available. Local indexing, fuzzy song lookup, favorites, and background mpv playback are available. The TUI uses text labels, square panels, and muted Gruvbox colors. Animation is disabled; the Windows tray uses a small static monochrome `b`. `bxvzm` is the Python package and command alias.
 
 ## Install and run
 
@@ -51,7 +51,20 @@ Scanning accepts MP3, FLAC, M4A/AAC, OGG/Opus, and WAV. It reads local tags, dur
 
 ## Download and import music
 
-In **Search** (`2`), paste a direct HTTPS Deezer, TIDAL, or Amazon Music album/track link. Use **Copy link** and **Open DoubleDouble**, paste the link in the browser, and finish the download manually. DoubleDouble is never automated; its [FAQ](https://us.doubledouble.top/faq/) describes its manual workflow and lack of an API. Shortened links and other hosts are rejected.
+In **Search** (`2`), type a song name and optionally its artist, then press Enter or **Search songs**. The app searches Deezer's public catalog and displays up to 20 results with title, artist, album, and the provider's track-level explicit flag (missing flags stay unknown). Select the correct album/edition; Enter on a result or **Use album link** fills the download-link field. **Use track link** selects the individual song instead. Open **DoubleDouble** and its URL input is already filled; handle CAPTCHA and start the download in the browser. You do not need to find or paste a link for catalog results.
+
+CLI discovery is separate from local playback:
+
+```sh
+bxvzm --search "Circles Post Malone"
+bxvzm --search "Circles Post Malone" --result 1 --open-browser
+bxvzm --search "Circles Post Malone" --result 1 --track-link --open-browser
+bxvzm --song "cirle"
+```
+
+`--result N` chooses from a fresh search response; review the printed title/artist/album and browser page before downloading. Album links are the default. `--song` searches and plays indexed local audio; it does not search online or download a missing song. Search runs only when submitted, in a worker, with a ten-second HTTP timeout and a 2 MiB decoded-response limit. Offline/error/empty states leave local playback usable. Catalog metadata remains separate from imported-file metadata and does not establish album completeness or clean/explicit status for imported files. Full pagination, MusicBrainz reference lookup and edition verification remain upcoming.
+
+Amazon Music in-app catalog search is not implemented: its [official API](https://www.developer.amazon.com/docs/music/API_web_overview_v2.html) is in closed beta and needs approved developer access and authentication. Amazon is not silently searched through private endpoints. You can still paste a direct Amazon Music, TIDAL, or Deezer HTTPS album/track URL and open a prefilled DoubleDouble page. No service is substituted for a pasted Amazon link. Shortened links and other hosts are rejected. The public `?url=` handoff fills the input; the app does not submit downloads or automate CAPTCHA. DoubleDouble's [FAQ](https://us.doubledouble.top/faq/) describes the lack of a download API.
 
 In **Imports** (`5`), enter the downloaded ZIP, audio file, or folder path and choose **Stage files**. Review the full file list, local tags, disc/track numbers, formats, duplicate count, and any errors. **Accept unverified** copies the original bytes into a separate import folder and indexes them. **Discard staged** removes only that job's staging copies. Source files remain untouched.
 
@@ -94,7 +107,7 @@ docker compose -f docker/compose.yaml exec -T app bxvzm --song "circle"
 docker compose -f docker/compose.yaml down
 ```
 
-On Linux/macOS, `sh docker/bxvzm.sh open tui` provides the same wrapper. For a **native Linux Docker host** with ALSA devices, add `-f docker/compose.audio.yaml` to the direct Compose commands to expose `/dev/snd`. This optional audio configuration has not been tested on a Linux audio device. Docker Desktop Windows/macOS does not gain sound from that override. Browser opening is done on the host; in a container use `--download URL` and open the printed DoubleDouble URL manually. Clipboard forwarding on Unix/container terminals depends on terminal OSC 52 support.
+On Linux/macOS, `sh docker/bxvzm.sh open tui` provides the same wrapper. For a **native Linux Docker host** with ALSA devices, add `-f docker/compose.audio.yaml` to the direct Compose commands to expose `/dev/snd`. This optional audio configuration has not been tested on a Linux audio device. Docker Desktop Windows/macOS does not gain sound from that override. Browser opening is done on the host; in a container use `--search QUERY --result N` or `--download URL` and open the printed prefilled DoubleDouble URL manually. Clipboard forwarding on Unix/container terminals depends on terminal OSC 52 support.
 
 The bind mount exposes only this bundle's `data/`. Container settings use `data/container-config.json` and a separate `data/container-library` to avoid conflicting with a native daemon. Place downloaded files in `data/downloads/` and import using `/app/data/downloads/...`. Container paths are Linux paths. No service ports are published. Do not run two daemons against the same library across the host and container.
 
@@ -121,7 +134,7 @@ Typing in the filter takes precedence over shortcuts. The player bar follows CLI
 
 This is a per-user background process, with no administrator-level Windows Service or login-startup registration. Windows tray behavior is the initial target. Linux/macOS use a background process without a tray; their native audio playback has not been accepted yet.
 
-Catalog search, playlist/queue editing, shuffle/repeat, reference-verified imports, export, and backup remain upcoming. Search currently provides the manual download handoff; Imports provides staging and explicit unverified acceptance.
+Playlist/queue editing, shuffle/repeat, reference-verified imports, export, and backup remain upcoming. Search provides Deezer song-name discovery and prefilled handoff; Imports provides staging and explicit unverified acceptance.
 
 ## Portable storage
 
@@ -149,7 +162,8 @@ All application storage stays inside ignored `data/`. Settings and indexed paths
 | Location | Responsibility |
 | --- | --- |
 | `src/bxvzm/cli.py` | Command arguments and dispatch |
-| `src/bxvzm/ui/` | Main TUI and download/import panels |
+| `src/bxvzm/ui/` | Main TUI, catalog search, download/import panels |
+| `src/bxvzm/catalog/deezer.py` | Public provider metadata lookup and bounded responses |
 | `src/bxvzm/transfers/links.py` | Provider URL validation and browser handoff |
 | `src/bxvzm/transfers/imports.py` | Bounded staging, hashes, acceptance and recovery |
 | `src/bxvzm/database.py` | SQLite migrations, jobs/history, index transactions |
@@ -179,3 +193,5 @@ Use `.venv/bin/python` on Linux/macOS. Tests use synthetic audio and isolated te
 `docker compose -f docker/compose.yaml run --rm --build checks` repeats pytest, Ruff lint/format, and dependency checks in Python 3.13.16 on Linux. The runtime target has no pytest/Ruff; the checks target and Compose checks service exist on `dev` only. The import review screenshot is [tests/artifacts/imports.svg](tests/artifacts/imports.svg).
 
 Native Windows smoke validation uses a silent synthetic WAV to check the hidden tray window, single instance, real mpv named-pipe playback, pause, seek, volume, exit cleanup, and restart without autoplay. Audible output and the visible right-click menu still require human verification. Linux/macOS playback, Windows login startup, and long-library performance are not validated.
+
+The catalog search screenshot is [tests/artifacts/search.svg](tests/artifacts/search.svg).

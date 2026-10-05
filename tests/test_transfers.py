@@ -18,7 +18,7 @@ from bxvzm.indexing import scan_library
 from bxvzm.library import LibraryLayout
 from bxvzm.locking import exclusive_lock
 from bxvzm.transfers.imports import accept_import, discard_import, stage_import
-from bxvzm.transfers.links import DOUBLEDOUBLE_URL, open_download_page, validate_provider_url
+from bxvzm.transfers.links import download_page_url, open_download_page, validate_provider_url
 
 
 class ProviderTests(unittest.TestCase):
@@ -49,7 +49,7 @@ class ProviderTests(unittest.TestCase):
                 self.assertEqual((link.provider, link.kind, link.url), (provider, kind, canonical))
                 with patch("bxvzm.transfers.links.webbrowser.open", return_value=True) as browser:
                     open_download_page(link)
-                browser.assert_called_once_with(DOUBLEDOUBLE_URL, new=2)
+                browser.assert_called_once_with(download_page_url(link), new=2)
 
     def test_spoofed_private_and_malformed_links_are_rejected(self) -> None:
         for value in (

@@ -89,6 +89,8 @@ class TransferInterfaceTests(unittest.IsolatedAsyncioTestCase):
                 await app.workers.wait_for_complete()
                 await pilot.press("2")
                 app.query_one("#download-url", Input).value = "https://evil.test/song"
+                app.query_one("#open-download", Button).scroll_visible(animate=False)
+                await pilot.pause()
                 with patch("bxvzm.ui.transfers.open_download_page") as browser:
                     await pilot.click("#open-download")
                     await app.workers.wait_for_complete()
