@@ -18,12 +18,13 @@ from bxvzm.transfers.links import DOUBLEDOUBLE_URL, open_download_page, validate
 class DownloadPanel(Vertical):
     def compose(self) -> ComposeResult:
         yield Static("Download music | Deezer / TIDAL / Amazon Music", classes="empty-state")
-        yield Input(placeholder="Paste an HTTPS album or track URL", id="download-url")
+        yield Input(placeholder="Selected album/track URL, or paste your own", id="download-url")
         with Horizontal(classes="transfer-actions"):
             yield Button("Copy link", id="copy-provider")
             yield Button("Open DoubleDouble", id="open-download")
         yield Static(
-            f"Download in your browser at {DOUBLEDOUBLE_URL}\n"
+            f"DoubleDouble handoff: {DOUBLEDOUBLE_URL}\n"
+            "Opening fills the URL input; complete CAPTCHA/download in your browser.\n"
             "Then select the ZIP, file, or folder in Imports.\n"
             "The source link is evidence; it does not verify the album edition.",
             id="download-status",
@@ -66,7 +67,10 @@ class DownloadPanel(Vertical):
     def _open(self, url: str) -> None:
         try:
             open_download_page(validate_provider_url(url))
-            message = "Paste the provider URL in DoubleDouble and finish the download manually."
+            message = (
+                "DoubleDouble opened with the URL filled in. "
+                "Complete CAPTCHA/download in the browser."
+            )
         except (OSError, RuntimeError, ValueError) as error:
             message = str(error)
         self.app.call_from_thread(self._status, message)

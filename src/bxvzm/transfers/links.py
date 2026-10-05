@@ -3,7 +3,7 @@
 import re
 import webbrowser
 from dataclasses import dataclass
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 DOUBLEDOUBLE_URL = "https://us.doubledouble.top/"
 AMAZON_HOSTS = frozenset(
@@ -69,8 +69,13 @@ def validate_provider_url(value: str) -> ProviderLink:
     )
 
 
+def download_page_url(link: ProviderLink) -> str:
+    """Use the site's public URL-prefill handoff; never submit a download."""
+    canonical = validate_provider_url(link.url).url
+    return DOUBLEDOUBLE_URL + "?url=" + quote(canonical, safe="")
+
+
 def open_download_page(link: ProviderLink) -> None:
-    """Open only the fixed handoff site; submit the provider URL manually."""
-    validate_provider_url(link.url)
-    if not webbrowser.open(DOUBLEDOUBLE_URL, new=2):
-        raise RuntimeError(f"Open {DOUBLEDOUBLE_URL} in your browser and paste {link.url}")
+    url = download_page_url(link)
+    if not webbrowser.open(url, new=2):
+        raise RuntimeError(f"Open {url} in your browser; its URL input will be prefilled")

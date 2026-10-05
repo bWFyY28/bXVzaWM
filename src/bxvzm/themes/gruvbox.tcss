@@ -119,6 +119,18 @@ HelpScreen {
     height: 6;
 }
 
+#catalog-results {
+    height: 8;
+}
+
+#catalog-status {
+    height: auto;
+}
+
+DownloadPanel {
+    height: auto;
+}
+
 #import-detail, #download-status {
     height: auto;
     margin: 1 0;

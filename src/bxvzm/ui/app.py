@@ -18,7 +18,8 @@ from bxvzm.library import LibraryLayout
 from bxvzm.metadata import Track
 from bxvzm.search import find_songs
 from bxvzm.service import request, start_service
-from bxvzm.ui.transfers import DownloadPanel, ImportPanel
+from bxvzm.ui.catalog import CatalogPanel
+from bxvzm.ui.transfers import ImportPanel
 
 
 class HelpScreen(ModalScreen[None]):
@@ -102,7 +103,7 @@ class MusicApp(App[None]):
                 yield Static("Copy audio into music/, then press r to scan.", id="library-status")
                 yield Static(str(self.layout.music), id="library-root", markup=False)
             with TabPane("Search", id="search"):
-                yield DownloadPanel()
+                yield CatalogPanel()
             with TabPane("Favorites", id="favorites"):
                 yield DataTable(id="favorite-tracks", cursor_type="row", zebra_stripes=False)
                 yield Static(
