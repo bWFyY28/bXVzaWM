@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bxvzm"
-version = "0.1.1"
+version = "0.1.2"
 description = "A local music library and terminal player"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"

@@ -4,7 +4,11 @@ A local music TUI with the simplicity of foobar2000 and the navigation of a mode
 
 Built for personal, single-user use: straightforward Python modules, SQLite, and standard file/import safeguards. Application data and settings stay inside this folder for portability. Python is installed separately. Keep implementation complexity proportional to the features actually in use.
 
-**Status:** version 0.1.1 adds cross-platform setup and launching to the project foundation. The package includes a starter Textual interface, portable configuration and library layout, transactional SQLite migrations, tests, and Docker check configuration. File indexing, playback, catalogs, and verified imports remain upcoming milestones.
+**Status:** version 0.1.2 separates the release and development branches. The package includes a starter Textual interface, portable configuration and library layout, transactional SQLite migrations, tests, and Docker check configuration. File indexing, playback, catalogs, and verified imports remain upcoming milestones.
+
+`dev` is the single branch for development and testing, including tests, Docker checks, editor settings, and development dependencies. [`main`](https://github.com/bWFyY28/bXVzaWM/tree/main) contains only the source, theme, installer, launchers, runtime/build dependency pins, packaging manifest, ignore rules, and user instructions needed to install and run the app.
+
+Develop and validate changes on `dev`. For a completed version, copy the validated application files and version to `main`, keep its installer and README focused on runtime setup, and exclude development files and configuration. Commit and push both branches after their relevant checks pass. Do not merge `dev` wholesale into `main`, which would bring back development tooling. Keep the same application version on both branches.
 
 Keep the original name **`bXVzaVM`**. `bxvzm` is its Python package and command alias. Local `PLAN.md` and `AGENTS.md` record implementation decisions; update both whenever ideas, scope, or design decisions change. Git ignores these documents and related local agent/planning artifacts, while preserving them on disk.
 
