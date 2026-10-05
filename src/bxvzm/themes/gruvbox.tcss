@@ -3,9 +3,45 @@ Screen {
     color: #d4be98;
 }
 
-Header, Footer {
+#title, Footer {
     background: #32302f;
     color: #d4be98;
+}
+
+#title {
+    height: 1;
+    padding: 0 1;
+    text-style: bold;
+}
+
+DataTable {
+    height: 1fr;
+    background: #282828;
+}
+
+DataTable > .datatable--header {
+    background: #32302f;
+    color: #d4be98;
+}
+
+DataTable > .datatable--cursor {
+    background: #7daea3;
+    color: #282828;
+}
+
+#filter {
+    height: 3;
+    border: solid #504945;
+    margin-bottom: 1;
+}
+
+#filter:focus {
+    border: solid #7daea3;
+}
+
+#library-status {
+    height: auto;
+    color: #a89984;
 }
 
 #views {
@@ -38,7 +74,7 @@ Underline > .underline--bar {
 
 #library-root {
     color: #a89984;
-    height: auto;
+    height: 1;
     overflow-x: auto;
 }
 
@@ -62,4 +98,3 @@ HelpScreen {
     border: solid #7daea3;
     background: #32302f;
 }
-

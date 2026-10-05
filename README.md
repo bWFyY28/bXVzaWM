@@ -1,159 +1,114 @@
 # bXVzaVM
 
-A local music TUI with the simplicity of foobar2000 and the navigation of a modern music app. The interface uses minimal brutalist panels and a dark Gruvbox Material palette with muted blue accents.
+A portable, personal music terminal app. Version **0.2.0** adds local indexing, fuzzy song lookup, favorites, and background mpv playback. The TUI uses text labels, square panels, and muted Gruvbox colors. Animation is disabled; the Windows tray uses a small static monochrome `b`. `bxvzm` is the Python package and command alias.
 
-Built for personal, single-user use: straightforward Python modules, SQLite, and standard file/import safeguards. Application data and settings stay inside this folder for portability. Python is installed separately. Keep implementation complexity proportional to the features actually in use.
+## Install and run
 
-**Status:** version 0.1.2 separates the release and development branches. The package includes a starter Textual interface, portable configuration and library layout, transactional SQLite migrations, tests, and Docker check configuration. File indexing, playback, catalogs, and verified imports remain upcoming milestones.
-
-`dev` is the single branch for development and testing, including tests, Docker checks, editor settings, and development dependencies. [`main`](https://github.com/bWFyY28/bXVzaWM/tree/main) contains only the source, theme, installer, launchers, runtime/build dependency pins, packaging manifest, ignore rules, and user instructions needed to install and run the app.
-
-Develop and validate changes on `dev`. For a completed version, copy the validated application files and version to `main`, keep its installer and README focused on runtime setup, and exclude development files and configuration. Commit and push both branches after their relevant checks pass. Do not merge `dev` wholesale into `main`, which would bring back development tooling. Keep the same application version on both branches.
-
-Keep the original name **`bXVzaVM`**. `bxvzm` is its Python package and command alias. Local `PLAN.md` and `AGENTS.md` record implementation decisions; update both whenever ideas, scope, or design decisions change. Git ignores these documents and related local agent/planning artifacts, while preserving them on disk.
-
-## Planned experience
-
-- Browse Library, Search, Favorites, Playlists, and Imports with keyboard or mouse.
-- Keep playback controls visible: play/pause, queue, previous/next, seek, volume, shuffle, and repeat.
-- Search Deezer and use MusicBrainz to identify album editions and tracklists.
-- Accept browser-selected Amazon Music, TIDAL, and other DoubleDouble-supported links without requiring provider credentials.
-- Choose the exact original, remastered, deluxe, anniversary, explicit, or clean edition before importing.
-- Hold incomplete or uncertain albums for review instead of silently adding the wrong release.
-
-## Technology board
-
-| Area | Planned technology | Purpose |
-| --- | --- | --- |
-| Runtime | Python 3.13.x | Previous stable feature series selected for this project |
-| Terminal interface | Textual 8.1.1, Textual CSS | Navigation, tables, dialogs, blue-accented theme |
-| Catalog requests | HTTPX | Deezer and MusicBrainz metadata adapters |
-| Audio metadata | Mutagen | Read tags, duration, codec, and available quality information |
-| Library index | Python's built-in SQLite | Metadata, relative paths, playlists, favorites, import state |
-| Audio playback | mpv, local JSON IPC | Native playback without a separate player window |
-| Windows IPC | Windows-only IPC support | Communicate with mpv through named pipes |
-| Isolation | `.venv`, pinned dependency locks | Keep project packages out of global Python |
-| Reproducible checks | Docker, pytest, Ruff | Test and lint using a separate tooling image |
-
-Use maintained fixes within the selected feature series. Pin resolved dependencies and the Docker image during implementation; do not use floating `latest` tags or prereleases.
-
-## Download workflow
-
-1. Search for an album or paste a supported provider link.
-2. Select an edition and review its expected tracklist.
-3. Copy the provider URL and open [DoubleDouble](https://us.doubledouble.top/) in the browser.
-4. Submit the URL and complete the website download manually.
-5. Import the downloaded ZIP, audio file, or folder into bXVzaVM.
-6. Review completeness and edition evidence before committing the album to the library.
-
-DoubleDouble's [FAQ](https://us.doubledouble.top/faq/) states that it has no API and asks users not to automate the website. The app will use a browser handoff rather than website automation.
-
-Automated catalog access varies by provider. [Amazon's catalog API](https://www.developer.amazon.com/docs/music/API_web_search_v2.html) is in closed beta; [TIDAL's API](https://developer.tidal.com/documentation/api-sdk/api-sdk-authorization) requires developer credentials. Their links remain usable in the manual workflow. If metadata cannot be resolved automatically, select a reference release; a pasted link alone does not establish its edition.
-
-## Files and database
-
-Application files live under this project's ignored `data/` folder:
-
-```text
-bXVzaWM\
-  run.cmd
-  .venv\
-  data\
-    config.json
-    library\
-      library.sqlite3
-      music\Artist\Album [edition and release ID]\01 - Title.flac
-      playlists\
-      .staging\
-```
-
-Songs stay as ordinary audio files. SQLite stores their index and relative paths, file hashes, metadata, edition references, verification evidence, favorites, playlist ordering, import history, and saved playback state. It does not store audio blobs.
-
-Imports preserve the original downloaded audio. Embedded tags determine readable folder names; Windows-safe sanitization and hash suffixes prevent filename collisions. Different album editions have separate folders. Files with missing tags receive explicit fallback labels.
-
-Pending imports stay in `.staging` until the user repairs them, selects a better reference, discards them, or explicitly accepts the mismatch. Accepted mismatches remain labeled in the library.
-
-### Completeness and edition checks
-
-Count expected track slots across all discs and compare them with imported files using available IDs, ISRCs, track positions, titles, artist credits, and durations. Equal file counts alone do not prove completeness: duplicates or unexpected songs cannot replace missing tracks.
-
-Store tracklist completeness separately from edition confidence. Missing explicit/clean or remaster evidence stays unknown. Metadata matching cannot conclusively prove a particular mastering or uncensored recording.
-
-### Audio quality
-
-Prefer genuine **FLAC**, but accept original MP3, AAC, and other supported formats when lossless downloads are unavailable. FLAC is a format; bit depth and sample rate describe resolution, such as 16-bit/44.1 kHz. Show available quality information and preserve the source format. Converting lossy files to FLAC does not improve their quality, and source availability determines download resolution.
-
-### Export and backup
-
-- Export selected tracks, albums, or playlists by copying audio and generating relative-path M3U8 playlists.
-- Back up the full library using a consistent SQLite backup plus audio files, preserving favorites and verification records.
-- Move the whole project folder, including `data/`; preferences and stored song paths remain relative.
-- Rescan files to recover the song index. Restoring favorites and playlists requires the database backup.
-- Exclude pending staging imports from ordinary music exports.
-
-## Setup and development
-
-Install Python **3.13** separately and open a terminal in this folder. The same setup script works on Windows, Linux/WSL, and macOS:
+Install Python **3.13** separately, then run from this folder:
 
 ```sh
 python install.py
 python run.py
 ```
 
-Use `py -3.13` on Windows or `python3.13` on Linux/macOS if `python` is not your Python 3.13 command. You can also pass the full path to an installed Python 3.13 executable. The first setup needs internet access. No environment activation, PowerShell policy changes, or administrator access are required by the setup script.
+Use `py -3.13` on Windows or `python3.13` on Linux/macOS if needed. Windows also supports `./run.cmd`. Setup creates the local `.venv`, installs pinned dependencies, checks them, and initializes the library. No activation or administrator access is needed. Rerun setup after updating; use `python install.py --recreate` after moving computers or OSes. Recreation preserves `data/`. Setup temporary files stay under `data/.setup-tmp`, with global pip caching disabled.
 
-Setup creates `.venv`, installs pinned runtime/build dependencies and the app, verifies dependencies, and initializes `data/library`. Temporary installation files stay in `data/.setup-tmp`, and global pip download caching is disabled. Rerun setup after updating the code. For development tools, use `python install.py --dev`. To rebuild the environment after moving computers or OSes, use `python install.py --recreate`; `data/` is preserved. Recognized incompatible environments are rebuilt automatically. macOS uses the same Python setup flow, but native playback remains a future acceptance target.
+Playback needs **mpv 0.41.0**. Download the appropriate Windows ZIP from the [official stable release](https://github.com/mpv-player/mpv/releases/tag/v0.41.0), unpack it (including its nested ZIP), and place `mpv.exe` and its accompanying DLLs in `data/tools/`. An mpv installation on PATH also works. The app uses [mpv JSON IPC](https://mpv.io/manual/master/#json-ipc), with no player window or user mpv configuration. Missing mpv leaves browsing and scanning available.
 
-On Windows you can also use `./run.cmd`. Both launchers find the source relative to their own location, so another working directory does not change where data lives. Keep `data/` when moving the application. Python and Docker themselves remain separately installed tools.
+Install **JetBrains Mono Nerd Font** separately and select `JetBrainsMono Nerd Font` in your terminal's font settings. For Windows Terminal, the profile font setting is:
 
-`requirements/runtime.txt` pins runtime dependencies, `requirements/build.txt` pins packaging tools, and `requirements/dev.txt` adds pytest and Ruff with their dependencies. Development tools are not runtime dependencies. The installer uses these files; manual installation remains available.
+```json
+"font": { "face": "JetBrainsMono Nerd Font" }
+```
 
-For manual runtime-only setup, install `requirements/runtime.txt` and `requirements/build.txt` in `.venv`, then `python -m pip install --no-deps --no-build-isolation -e .`. Keep dependency changes pinned in the appropriate snapshots. Do not share one virtual environment between Windows and Linux.
+Terminal fonts are controlled by the terminal, rather than Textual. The UI uses ordinary text and does not require icon glyphs. Keep the terminal at least 80 columns by 24 rows.
 
-The starter interface provides five views, numeric shortcuts `1`–`5`, arrow/Tab navigation, `?` for help, and `q` to quit. The square panels use the planned Gruvbox Material colors. Views describe the features still to come; there is no audio playback or import action yet.
+## Add music and play
 
-The default library is `data/library`, resolved from the application folder rather than the current working directory. To select another library within `data/`:
+Copy your audio files or artist/album folders into `data/library/music/`, then scan:
 
 ```sh
-bxvzm --library data/another-library --check
+python run.py --scan
+python run.py --song "cirle"
+python run.py --status
+python run.py --pause
+python run.py --stop-service
+```
+
+`--song` fuzzy-searches indexed local titles and artist names, so `cirle` can match `Circles - Post Malone` when that song is in your library. A confident match starts the background service if necessary and plays immediately. Similar editions or weak matches show numbered candidates; choose with `--song "cirle" --match 2`. No match returns exit code 1; a choice needing selection returns 2. Search does not download songs.
+
+To type the installed command directly in the current PowerShell session, temporarily add this bundle's environment to PATH:
+
+```powershell
+$env:PATH = "$PWD\.venv\Scripts;$env:PATH"
+bxvzm --song "cirle"
 bxvzm
 ```
 
-On Windows, for example: `./run.cmd --library data/another-library --check`. `--check` initializes the directories and SQLite database without starting the TUI. `--library` remembers the selection only after successful initialization. An explicit root overrides the `BXVZM_LIBRARY` environment variable, which overrides the saved selection. All roots must stay inside this application's `data/` folder; external paths and symlink escapes are rejected. The environment override is temporary.
+On Linux/macOS, use `export PATH="$PWD/.venv/bin:$PATH"`. The launchers work without changing PATH and resolve data independently of the working directory.
 
-Preferences live at `data/config.json`. Saved selections use a relative path such as `data/library`, so moving the folder needs no path edits. `--config PATH` can select another preferences file inside `data/`. AppData, XDG config folders, and the user's Music folder are not used. The library contains `music/`, `playlists/`, `.staging/`, and `library.sqlite3`; the initial database holds portable application state and creation metadata. Future migrations will add the song index and import records. It refuses a newer database schema and rolls back failed migrations. No playback starts automatically.
+Scanning accepts MP3, FLAC, M4A/AAC, OGG/Opus, and WAV. It reads local tags, duration and available quality fields, hashes original bytes, and stores relative file paths. Untagged files use their filenames and explicit Unknown labels. Duplicate files remain separate; missing or unreadable files remain indexed as unavailable, preserving favorites. A failed directory traversal preserves the previous snapshot. Linked files/folders and Windows junctions are excluded. `--scan` prints file issues and returns 1 when issues are found. Scanning does not prove album completeness, mastering, or clean/explicit status.
 
-Run the full checks after `python install.py --dev`, using `.venv/Scripts/python.exe` on Windows or `.venv/bin/python` on Linux/macOS in place of `python`:
+## TUI and background service
 
-```sh
-python -m pytest
-python -m ruff check .
-python -m ruff format --check .
-docker compose run --rm --build checks
+Opening the TUI starts or connects to the selected library's background process. Windows shows the monochrome `b` in the notification area, possibly under hidden tray icons. Right-click it and choose **Exit bXVzaVM** to stop the service and mpv. `--daemon` starts it without opening the TUI; `--stop-service` also stops it.
+
+| Key | Action |
+| --- | --- |
+| `1` to `5` | Library, Search, Favorites, Playlists, Imports |
+| Arrows or `j` / `k` | Navigate tracks |
+| `/` | Filter local title, artist, album, or path; title/artist typos are supported |
+| Enter in filter / Esc | Return to tracks |
+| Enter on track | Play through the background process |
+| Space | Pause/resume |
+| `h` / `l` | Seek backward/forward 5 seconds |
+| `-` / `+` | Adjust volume |
+| `f` | Toggle selected favorite |
+| `r` | Rescan `music/` in a worker |
+| `?` | Help |
+| `q` | Close the TUI; background playback continues |
+
+Typing in the filter takes precedence over shortcuts. The player bar follows CLI changes while the TUI is open. One service owns playback per selected library. Selection, position, and volume persist; starting the service never automatically plays audio. Exit the service before moving the bundle or rebuilding `.venv`.
+
+This is a per-user background process, with no administrator-level Windows Service or login-startup registration. Windows tray behavior is the initial target. Linux/macOS use a background process without a tray; their native audio playback has not been accepted yet.
+
+Catalog search, playlist/queue editing, shuffle/repeat, verified imports, export, and backup remain upcoming. The Search, Playlists, and Imports tabs currently describe that work. Future downloads use manual DoubleDouble browser handoff; uncertain editions remain under review.
+
+## Portable storage
+
+```text
+bXVzaWM/
+  .venv/
+  data/
+    config.json
+    tools/mpv.exe
+    library/
+      library.sqlite3
+      music/
+      playlists/
+      .staging/
+      .service.json
+      .service.log
 ```
 
-Start Docker Desktop with Linux containers before running the Compose command. No local `.venv` is needed for Docker checks. The first build needs internet access to download the image and packages; checks run with container networking disabled. Rebuild after source changes because the image contains a copy of the project.
+All application storage stays inside ignored `data/`. Settings and indexed paths are relative to the bundle; audio remains on disk. Storage outside `data/` and symlink escapes are rejected. No application files are placed in AppData, XDG directories, the home folder, or Music. Service endpoint credentials/logs stay within the selected library and are not committed.
 
-The Docker checks use the digest-pinned `python:3.13.16-slim-trixie` tooling image. The build runs the same `python install.py --dev` setup, including `pip check`; the container runs pytest, Ruff linting, and Ruff formatting checks with its local `.venv`. Docker handles tests and tooling; native Windows will handle interactive audio. Linux mpv uses Unix sockets rather than Windows named pipes. Running playback inside WSL requires a separately verified audio setup and is not an initial acceptance requirement.
+`python run.py --check` initializes without opening the interface or starting a service. `--library data/another-library` selects a library and remembers it after initialization. Command-line selection overrides `BXVZM_LIBRARY`, which overrides saved preferences; the environment override is temporary. `--config PATH` selects another preferences file inside `data/`. Existing schema-1 libraries migrate transactionally to schema 2 without removing saved state.
 
-To preview the starter interface in Docker with project-local data, run from PowerShell:
+## Development
+
+`dev` contains tests, screenshots, editor settings, and development tools. `main` contains runtime/setup files and concise user instructions. Validate on `dev`, copy only validated runtime changes and the matching version to `main`, commit/push both without force-pushing, and return to `dev`. Preserve ignored local `PLAN.md`, `AGENTS.md`, `.venv`, and `data/` across switches.
+
+Docker is no longer part of this project. Use the native environment:
 
 ```powershell
-docker compose run --rm -it --volume "${PWD}/data:/app/data" checks bxvzm
+python install.py --dev
+./.venv/Scripts/python.exe -m pytest
+./.venv/Scripts/python.exe -m ruff check .
+./.venv/Scripts/python.exe -m ruff format --check .
+./.venv/Scripts/python.exe -m pip check
 ```
 
-The bind mount preserves settings and the library in this folder's `data/` directory. Without that mount, application data exists only in the temporary container. Docker's images and cache are managed separately by Docker Desktop.
+Use `.venv/bin/python` on Linux/macOS. Tests use synthetic audio and isolated temporary bundles, mock playback, and check migration, rollback, relocation, duplicates, missing files, fuzzy lookup, service authentication/lifecycle, and keyboard behavior. Regenerate terminal screenshots with `BXVZM_SCREENSHOT_DIR=tests/artifacts` when running the UI tests. The populated example is [tests/artifacts/library.svg](tests/artifacts/library.svg).
 
-The storage tests also work without third-party dependencies. They model portable bundles in temporary test directories and do not import user audio or touch the real `data/` folder:
-
-```powershell
-$env:PYTHONPATH = "src"
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
-# These module commands also work before editable installation:
-.\.venv\Scripts\python.exe -m bxvzm --version
-.\.venv\Scripts\python.exe -m bxvzm --help
-```
-
-In Linux, use `PYTHONPATH=src python -m unittest discover -s tests -v`. Version 0.1.1 passes all 29 tests in Docker and 28 on Windows, with one Windows symlink-privilege skip. Both pass linting, formatting, and dependency checks. Fresh Linux setup and repeat Windows setup are verified; macOS has not been manually tested. Tests include bundle relocation, relative settings, external path rejection, UI navigation, and setup/recreation behavior. The terminal screenshot is [tests/artifacts/foundation.svg](tests/artifacts/foundation.svg). To regenerate it, set `BXVZM_SCREENSHOT_DIR=tests/artifacts` and run the UI test through the local environment's Python.
-
-Local commands and Docker builds can require reviewed access outside the agent sandbox. Completed versions are committed and pushed to the configured remote after checks pass, without force-pushing. Git ignores local agent/planning files and user data. The next feature milestone is local indexing and playback.
+Native Windows smoke validation uses a silent synthetic WAV to check the hidden tray window, single instance, real mpv named-pipe playback, pause, seek, volume, exit cleanup, and restart without autoplay. Audible output and the visible right-click menu still require human verification. Linux/macOS playback, Windows login startup, and long-library performance are not validated.
