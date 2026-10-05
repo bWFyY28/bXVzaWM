@@ -40,6 +40,9 @@ def scan_library(store: LibraryStore) -> ScanReport:
         raise ValueError("The music directory is missing; the index has been preserved")
     tracks = []
     issues = []
+    baseline = [track.relative_path for track in store.list_tracks()]
+    pending = store.pending_import_roots()
+    source_names = store.import_source_names()
 
     def traversal_error(error: OSError) -> None:
         raise error
@@ -48,6 +51,9 @@ def scan_library(store: LibraryStore) -> ScanReport:
         folder = Path(directory)
         for name in folders[:]:
             child = folder / name
+            if child.relative_to(layout.root).as_posix() in pending:
+                folders.remove(name)
+                continue
             if child.is_symlink() or child.is_junction():
                 folders.remove(name)
                 issues.append(ScanIssue(child.relative_to(layout.root).as_posix(), "Linked folder"))
@@ -64,10 +70,17 @@ def scan_library(store: LibraryStore) -> ScanReport:
                 layout.resolve_relative(relative)
                 if not path.is_file():
                     raise ValueError("Not a regular audio file")
-                tracks.append(read_track(path, relative))
+                original_name = source_names.get(relative)
+                tracks.append(
+                    read_track(
+                        path,
+                        relative,
+                        fallback_title=Path(original_name).stem if original_name else None,
+                    )
+                )
             except (OSError, ValueError, mutagen.MutagenError) as error:
                 issues.append(ScanIssue(relative, str(error)))
     counts = Counter(track.sha256 for track in tracks)
     duplicates = sum(count - 1 for count in counts.values())
-    missing = store.replace_scan(tracks, [asdict(issue) for issue in issues], duplicates)
+    missing = store.replace_scan(tracks, [asdict(issue) for issue in issues], duplicates, baseline)
     return ScanReport(len(tracks), missing, duplicates, tuple(issues))

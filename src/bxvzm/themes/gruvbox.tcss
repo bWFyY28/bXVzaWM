@@ -98,3 +98,28 @@ HelpScreen {
     border: solid #7daea3;
     background: #32302f;
 }
+
+.transfer-actions {
+    height: 3;
+}
+
+.transfer-actions Button {
+    margin-right: 1;
+    background: #32302f;
+    color: #d4be98;
+    border: solid #504945;
+    min-width: 16;
+}
+
+.transfer-actions Button:focus {
+    border: solid #7daea3;
+}
+
+#import-jobs {
+    height: 6;
+}
+
+#import-detail, #download-status {
+    height: auto;
+    margin: 1 0;
+}

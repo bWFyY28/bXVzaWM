@@ -1,0 +1,22 @@
+name: bxvzm
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: runtime
+    init: true
+    volumes:
+      - ../data:/app/data
+    healthcheck:
+      test: ["CMD", "bxvzm", "--config", "data/container-config.json", "--status"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+    stop_grace_period: 10s
+  checks:
+    profiles: [checks]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: checks

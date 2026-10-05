@@ -1,23 +1,24 @@
 """Per-library background playback with a bounded, authenticated local JSON API."""
 
-import hashlib
 import json
 import math
 import os
 import secrets
+import signal
 import socket
 import socketserver
 import subprocess
 import sys
 import threading
 import time
-from contextlib import contextmanager
+from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any
 
 from bxvzm.config import Settings
 from bxvzm.database import LibraryStore
 from bxvzm.library import LibraryLayout
+from bxvzm.locking import exclusive_lock
 from bxvzm.playback import MpvPlayer, PlaybackError
 
 MAX_MESSAGE = 65536
@@ -105,31 +106,8 @@ def start_service(settings: Settings) -> dict:
     raise ServiceError("Service did not start. See the library's .service.log.")
 
 
-@contextmanager
-def _instance_lock(layout: LibraryLayout):
-    """The OS releases ownership even when the process crashes."""
-    if os.name == "nt":
-        import win32api
-        import win32event
-        import winerror
-
-        identity = hashlib.sha256(str(layout.root).casefold().encode()).hexdigest()
-        handle = win32event.CreateMutex(None, False, f"Local\\bxvzm-{identity}")
-        acquired = win32api.GetLastError() != winerror.ERROR_ALREADY_EXISTS
-        try:
-            yield acquired
-        finally:
-            handle.Close()
-    else:
-        import fcntl
-
-        with _service_path(layout, ".service.lock").open("a") as stream:
-            try:
-                fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                yield False
-            else:
-                yield True
+def _instance_lock(layout: LibraryLayout) -> AbstractContextManager[bool]:
+    return exclusive_lock(layout, ".service.lock")
 
 
 class PlaybackController:
@@ -306,6 +284,7 @@ def serve(settings: Settings, *, tray: bool = True) -> int:
             return 0
         controller = PlaybackController(store, MpvPlayer(layout, settings.app_root))
         stop = threading.Event()
+        previous_signals = {}
         with ServiceServer(controller, stop) as server:
             endpoint = _service_path(layout, ".service.json")
             temporary = _service_path(layout, ".service.json.tmp")
@@ -313,6 +292,9 @@ def serve(settings: Settings, *, tray: bool = True) -> int:
             tray_icon = None
             last_save = 0.0
             try:
+                if threading.current_thread() is threading.main_thread():
+                    for number in (signal.SIGTERM, signal.SIGINT):
+                        previous_signals[number] = signal.signal(number, lambda *_: stop.set())
                 if tray and os.name == "nt":
                     from bxvzm.tray import TrayIcon
 
@@ -351,4 +333,6 @@ def serve(settings: Settings, *, tray: bool = True) -> int:
                         controller.close()
                     finally:
                         endpoint.unlink(missing_ok=True)
+                        for number, handler in previous_signals.items():
+                            signal.signal(number, handler)
     return 0

@@ -37,6 +37,32 @@ class DatabaseTests(unittest.TestCase):
         self.store.save_state("queue", {"title": "Updated"})
         self.assertEqual(self.store.load_state("queue"), {"title": "Updated"})
 
+    def test_schema_two_upgrade_preserves_index_favorites_and_playback(self) -> None:
+        from helpers import write_wave
+
+        from bxvzm.database import MIGRATIONS
+        from bxvzm.indexing import scan_library
+
+        with (
+            patch("bxvzm.database.MIGRATIONS", MIGRATIONS[:2]),
+            patch("bxvzm.database.SCHEMA_VERSION", 2),
+        ):
+            self.store.initialize()
+        write_wave(self.layout.music / "song.wav")
+        # Schema 2 does not have the pending-import query used by the new scanner.
+        with (
+            patch.object(self.store, "pending_import_roots", return_value=[]),
+            patch.object(self.store, "_pending_import_roots", return_value=[]),
+            patch.object(self.store, "import_source_names", return_value={}),
+        ):
+            scan_library(self.store)
+        self.store.toggle_favorite("music/song.wav")
+        self.store.save_state("playback", {"path": "music/song.wav", "position": 12})
+        self.store.initialize()
+        self.assertTrue(self.store.list_tracks()[0].favorite)
+        self.assertEqual(self.store.load_state("playback")["position"], 12)
+        self.assertEqual(self.store.list_imports(), [])
+
     def test_newer_schema_is_refused_without_modification(self) -> None:
         self.store.initialize()
         self.store.save_state("sentinel", "preserve me")

@@ -136,7 +136,7 @@ class InterfaceTests(unittest.IsolatedAsyncioTestCase):
 
             async with app.run_test(size=(80, 24)) as pilot:
                 await app.workers.wait_for_complete()
-                with patch("bxvzm.ui.scan_library", side_effect=slow_scan):
+                with patch("bxvzm.ui.app.scan_library", side_effect=slow_scan):
                     try:
                         await pilot.press("r", "2")
                         self.assertEqual(app.query_one(TabbedContent).active, "search")
