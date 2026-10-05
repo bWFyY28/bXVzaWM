@@ -11,8 +11,8 @@ class LibraryLayout:
     root: Path
 
     @classmethod
-    def at(cls, root: Path) -> "LibraryLayout":
-        return cls(validate_library_root(root))
+    def at(cls, root: Path, app_root: Path | None = None) -> "LibraryLayout":
+        return cls(validate_library_root(root, app_root))
 
     @property
     def database(self) -> Path:
@@ -71,4 +71,3 @@ class LibraryLayout:
         relative = path.resolve().relative_to(self.root).as_posix()
         self.resolve_relative(relative)
         return relative
-

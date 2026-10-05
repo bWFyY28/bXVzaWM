@@ -1,4 +1,4 @@
-"""Machine preferences, independent of the portable library."""
+"""Portable preferences and storage confined to the application's data folder."""
 
 import json
 import os
@@ -16,30 +16,28 @@ class ConfigurationError(ValueError):
 class Settings:
     library_root: Path
     config_file: Path
+    app_root: Path
 
 
-def default_config_file(environ: Mapping[str, str] | None = None) -> Path:
-    env = os.environ if environ is None else environ
-    if os.name == "nt":
-        base = Path(env.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local")))
-    else:
-        base = Path(env.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
-    return base / "bxvzm" / "config.json"
-
-
-def repository_root() -> Path | None:
-    """Find a source checkout; installed wheels have no repository restriction."""
+def application_root() -> Path:
+    """Locate the source bundle independently of the current working directory."""
     for parent in Path(__file__).resolve().parents:
         if (parent / "pyproject.toml").is_file() and (parent / "src" / "bxvzm").is_dir():
             return parent
-    return None
+    return Path.cwd().resolve()
 
 
-def validate_library_root(root: Path, checkout: Path | None = None) -> Path:
-    resolved = root.expanduser().resolve()
-    checkout = repository_root() if checkout is None else checkout.resolve()
-    if checkout is not None and resolved.is_relative_to(checkout):
-        raise ConfigurationError("Choose a library root outside the source repository.")
+def portable_path(path: Path, app_root: Path) -> Path:
+    """Interpret relative paths from the bundle and reject external/symlink escapes."""
+    resolved = (path if path.is_absolute() else app_root / path).resolve()
+    if not resolved.is_relative_to(app_root / "data"):
+        raise ConfigurationError(f"Keep application files inside {app_root / 'data'}.")
+    return resolved
+
+
+def validate_library_root(root: Path, app_root: Path | None = None) -> Path:
+    anchor = (app_root or application_root()).resolve()
+    resolved = portable_path(root, anchor)
     if resolved.exists() and not resolved.is_dir():
         raise ConfigurationError(f"Library root is not a directory: {resolved}")
     return resolved
@@ -49,10 +47,12 @@ def load_settings(
     library_root: Path | None = None,
     config_file: Path | None = None,
     environ: Mapping[str, str] | None = None,
+    app_root: Path | None = None,
 ) -> Settings:
     """Precedence: command line, environment, saved selection, default."""
     env = os.environ if environ is None else environ
-    config = (config_file or default_config_file(env)).expanduser().resolve()
+    anchor = (app_root or application_root()).resolve()
+    config = portable_path(config_file or Path("data/config.json"), anchor)
     selection: str | Path | None = library_root or env.get("BXVZM_LIBRARY")
     if selection is None and config.exists():
         try:
@@ -64,19 +64,21 @@ def load_settings(
         selection = saved.get("library_root")
         if not isinstance(selection, str) or not selection.strip():
             raise ConfigurationError(f"Missing library_root in preferences: {config}")
-        if not Path(selection).is_absolute():
-            raise ConfigurationError(f"Saved library_root must be absolute: {config}")
+        if Path(selection).is_absolute() or ":" in selection or "\\" in selection:
+            raise ConfigurationError(f"Saved library_root must be portable and relative: {config}")
     if selection is None:
-        selection = Path.home() / "Music" / "bXVzaVM"
+        selection = Path("data/library")
     if isinstance(selection, str) and not selection.strip():
         raise ConfigurationError("Library root must not be empty.")
-    return Settings(validate_library_root(Path(selection)), config)
+    return Settings(validate_library_root(Path(selection), anchor), config, anchor)
 
 
 def save_settings(settings: Settings) -> None:
-    """Replace preferences atomically; never put an absolute root in SQLite."""
+    """Replace preferences atomically, saving a path relative to the bundle."""
+    portable_path(settings.config_file, settings.app_root)
+    root = validate_library_root(settings.library_root, settings.app_root)
+    payload = {"version": 1, "library_root": root.relative_to(settings.app_root).as_posix()}
     settings.config_file.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"version": 1, "library_root": str(settings.library_root)}
     temporary: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(

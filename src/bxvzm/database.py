@@ -1,7 +1,7 @@
 """Versioned, transactional SQLite foundation.
 
 Each operation owns its connection, allowing callers to run I/O in workers.
-Only portable state belongs here; machine preferences live in config.py.
+Only library state belongs here; portable preferences live in config.py.
 """
 
 import json
@@ -72,4 +72,3 @@ class LibraryStore:
                 "ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json",
                 (key, payload),
             )
-

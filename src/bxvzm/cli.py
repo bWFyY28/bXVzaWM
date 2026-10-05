@@ -15,8 +15,12 @@ from bxvzm.library import LibraryLayout
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="bXVzaVM local music library")
     parser.add_argument("--version", action="version", version=f"bXVzaVM {__version__}")
-    parser.add_argument("--library", type=Path, help="select and remember an external library root")
-    parser.add_argument("--config", type=Path, help="override the machine preferences file")
+    parser.add_argument(
+        "--library", type=Path, help="select a library inside the bundle's data folder"
+    )
+    parser.add_argument(
+        "--config", type=Path, help="select a preferences file inside the data folder"
+    )
     parser.add_argument(
         "--check", action="store_true", help="initialize/check the library without opening the TUI"
     )
@@ -31,7 +35,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             from bxvzm.ui import MusicApp
 
         settings = load_settings(args.library, args.config)
-        layout = LibraryLayout.at(settings.library_root)
+        layout = LibraryLayout.at(settings.library_root, settings.app_root)
         schema = LibraryStore(layout).initialize()
         if args.library is not None:
             save_settings(settings)

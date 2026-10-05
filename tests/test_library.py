@@ -10,7 +10,7 @@ class LibraryPathTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.base = Path(self.temporary.name)
-        self.layout = LibraryLayout.at(self.base / "library")
+        self.layout = LibraryLayout.at(self.base / "data" / "library", app_root=self.base)
 
     def test_absolute_and_traversal_paths_are_rejected_on_any_os(self) -> None:
         invalid = (
@@ -40,7 +40,7 @@ class LibraryPathTests(unittest.TestCase):
             self.layout.relative_path(self.base / "outside")
 
     def test_symlink_escape_is_rejected_before_library_writes(self) -> None:
-        self.layout.root.mkdir()
+        self.layout.root.mkdir(parents=True)
         outside = self.base / "outside"
         outside.mkdir()
         try:
@@ -51,4 +51,3 @@ class LibraryPathTests(unittest.TestCase):
             self.layout.initialize()
         self.assertEqual(list(outside.iterdir()), [])
         self.assertFalse(self.layout.staging.exists())
-

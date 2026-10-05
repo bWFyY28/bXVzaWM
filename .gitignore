@@ -28,6 +28,7 @@ credentials*.json
 config.local.json
 
 # User media, library databases, and unfinished imports
+data/
 *.sqlite3
 *.sqlite3-*
 *.sqlite

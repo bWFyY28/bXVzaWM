@@ -16,7 +16,7 @@ class DatabaseTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.base = Path(self.temporary.name)
-        self.layout = LibraryLayout.at(self.base / "original")
+        self.layout = LibraryLayout.at(self.base / "data" / "original", app_root=self.base)
         self.store = LibraryStore(self.layout)
 
     def test_initialize_is_repeatable_and_preserves_state(self) -> None:
@@ -74,11 +74,10 @@ class DatabaseTests(unittest.TestCase):
         asset.write_bytes(b"source bytes")
         relative = self.layout.relative_path(asset)
         self.store.save_state("queue", [relative])
-        relocated = LibraryLayout.at(self.base / "relocated")
+        relocated = LibraryLayout.at(self.base / "data" / "relocated", app_root=self.base)
         shutil.copytree(self.layout.root, relocated.root)
         reopened = LibraryStore(relocated)
         reopened.initialize()
         self.assertEqual(reopened.load_state("queue"), [relative])
         self.assertEqual(relocated.resolve_relative(relative).read_bytes(), b"source bytes")
         self.assertNotIn(str(self.layout.root).encode(), relocated.database.read_bytes())
-

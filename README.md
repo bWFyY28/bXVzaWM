@@ -2,9 +2,9 @@
 
 A local music TUI with the simplicity of foobar2000 and the navigation of a modern music app. The interface uses minimal brutalist panels and a dark Gruvbox Material palette with muted blue accents.
 
-Built for personal, single-user use: straightforward Python modules, SQLite, and standard file/import safeguards. Keep implementation complexity proportional to the features actually in use.
+Built for personal, single-user use: straightforward Python modules, SQLite, and standard file/import safeguards. Application data and settings stay inside this folder for portability. Python is installed separately. Keep implementation complexity proportional to the features actually in use.
 
-**Status:** project foundation implemented. The package includes a starter Textual interface, command-line configuration, external library layout, transactional SQLite migrations, tests, and Docker check configuration. File indexing, playback, catalogs, and verified imports remain upcoming milestones. Dependency installation, the TUI, Ruff, and Docker checks have not yet been validated because this session restricts network and service access.
+**Status:** version 0.1.1 adds cross-platform setup and launching to the project foundation. The package includes a starter Textual interface, portable configuration and library layout, transactional SQLite migrations, tests, and Docker check configuration. File indexing, playback, catalogs, and verified imports remain upcoming milestones.
 
 Keep the original name **`bXVzaVM`**. `bxvzm` is its Python package and command alias. Local `PLAN.md` and `AGENTS.md` record implementation decisions; update both whenever ideas, scope, or design decisions change. Git ignores these documents and related local agent/planning artifacts, while preserving them on disk.
 
@@ -48,14 +48,19 @@ Automated catalog access varies by provider. [Amazon's catalog API](https://www.
 
 ## Files and database
 
-The default Windows library will be configurable and stored outside the repository:
+Application files live under this project's ignored `data/` folder:
 
 ```text
-%USERPROFILE%\Music\bXVzaVM\
-  library.sqlite3
-  music\Artist\Album [edition and release ID]\01 - Title.flac
-  playlists\
-  .staging\
+bXVzaWM\
+  run.cmd
+  .venv\
+  data\
+    config.json
+    library\
+      library.sqlite3
+      music\Artist\Album [edition and release ID]\01 - Title.flac
+      playlists\
+      .staging\
 ```
 
 Songs stay as ordinary audio files. SQLite stores their index and relative paths, file hashes, metadata, edition references, verification evidence, favorites, playlist ordering, import history, and saved playback state. It does not store audio blobs.
@@ -78,66 +83,64 @@ Prefer genuine **FLAC**, but accept original MP3, AAC, and other supported forma
 
 - Export selected tracks, albums, or playlists by copying audio and generating relative-path M3U8 playlists.
 - Back up the full library using a consistent SQLite backup plus audio files, preserving favorites and verification records.
-- Move a copied library by selecting its new root; stored song paths remain relative.
+- Move the whole project folder, including `data/`; preferences and stored song paths remain relative.
 - Rescan files to recover the song index. Restoring favorites and playlists requires the database backup.
 - Exclude pending staging imports from ordinary music exports.
 
 ## Setup and development
 
-The initial playback target remains native Windows. WSL may host development and Docker checks. Do not share one virtual environment between Windows and Linux: recreate `.venv` in whichever environment runs the commands. If developing on WSL's Linux filesystem, clone or copy the project there and configure an accessible library root explicitly.
-
-Install a maintained Python 3.13 patch before creating a virtual environment. The bootstrap session found Python **3.13.0** at `%LOCALAPPDATA%\Programs\Python\Python313\python.exe`; the launcher did not detect it. That older interpreter was used for storage tests only. Upgrade it and recreate `.venv` before acceptance.
-
-```powershell
-# Windows
-py -3.13 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-# If the launcher does not detect an installed Python 3.13:
-# & "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe" -m venv .venv
-```
+Install Python **3.13** separately and open a terminal in this folder. The same setup script works on Windows, Linux/WSL, and macOS:
 
 ```sh
-# WSL, with python3.13 installed
-python3.13 -m venv .venv
-source .venv/bin/activate
+python install.py
+python run.py
 ```
 
-`requirements/runtime.txt` pins runtime dependencies, `requirements/build.txt` pins packaging tools, and `requirements/dev.txt` adds pytest and Ruff with their dependencies. These are provisional, fully pinned dependency snapshots; installation and resolver validation are pending. Development tools are not runtime dependencies. Install from a network-enabled shell:
+Use `py -3.13` on Windows or `python3.13` on Linux/macOS if `python` is not your Python 3.13 command. You can also pass the full path to an installed Python 3.13 executable. The first setup needs internet access. No environment activation, PowerShell policy changes, or administrator access are required by the setup script.
 
-```sh
-python -m pip install -r requirements/dev.txt
-python -m pip install --no-deps --no-build-isolation -e ".[dev]"
-python -m pip check
-bxvzm
-```
+Setup creates `.venv`, installs pinned runtime/build dependencies and the app, verifies dependencies, and initializes `data/library`. Temporary installation files stay in `data/.setup-tmp`, and global pip download caching is disabled. Rerun setup after updating the code. For development tools, use `python install.py --dev`. To rebuild the environment after moving computers or OSes, use `python install.py --recreate`; `data/` is preserved. Recognized incompatible environments are rebuilt automatically. macOS uses the same Python setup flow, but native playback remains a future acceptance target.
 
-For a runtime-only install, install `requirements/runtime.txt` and `requirements/build.txt`, then `python -m pip install --no-deps --no-build-isolation -e .`. Keep dependency changes pinned in the appropriate snapshots and validate a clean environment on each target OS.
+On Windows you can also use `./run.cmd`. Both launchers find the source relative to their own location, so another working directory does not change where data lives. Keep `data/` when moving the application. Python and Docker themselves remain separately installed tools.
+
+`requirements/runtime.txt` pins runtime dependencies, `requirements/build.txt` pins packaging tools, and `requirements/dev.txt` adds pytest and Ruff with their dependencies. Development tools are not runtime dependencies. The installer uses these files; manual installation remains available.
+
+For manual runtime-only setup, install `requirements/runtime.txt` and `requirements/build.txt` in `.venv`, then `python -m pip install --no-deps --no-build-isolation -e .`. Keep dependency changes pinned in the appropriate snapshots. Do not share one virtual environment between Windows and Linux.
 
 The starter interface provides five views, numeric shortcuts `1`–`5`, arrow/Tab navigation, `?` for help, and `q` to quit. The square panels use the planned Gruvbox Material colors. Views describe the features still to come; there is no audio playback or import action yet.
 
-The default library is `~/Music/bXVzaVM`. Select another root outside the source repository:
+The default library is `data/library`, resolved from the application folder rather than the current working directory. To select another library within `data/`:
 
 ```sh
-bxvzm --library /path/to/library --check
+bxvzm --library data/another-library --check
 bxvzm
 ```
 
-On Windows, for example: `bxvzm --library "D:\Music\bXVzaVM" --check`. `--check` initializes the directories and SQLite database without starting the TUI. `--library` remembers the selection only after successful initialization. An explicit root overrides the `BXVZM_LIBRARY` environment variable, which overrides the saved selection. The environment override is temporary.
+On Windows, for example: `./run.cmd --library data/another-library --check`. `--check` initializes the directories and SQLite database without starting the TUI. `--library` remembers the selection only after successful initialization. An explicit root overrides the `BXVZM_LIBRARY` environment variable, which overrides the saved selection. All roots must stay inside this application's `data/` folder; external paths and symlink escapes are rejected. The environment override is temporary.
 
-Preferences live outside the library at `%LOCALAPPDATA%\bxvzm\config.json` on Windows, or `$XDG_CONFIG_HOME/bxvzm/config.json` (default `~/.config/bxvzm/config.json`) on Linux. `--config PATH` selects a different preferences file. The library contains `music/`, `playlists/`, `.staging/`, and `library.sqlite3`; the initial database holds portable application state and creation metadata. Future migrations will add the song index and import records. It refuses a newer database schema and rolls back failed migrations. No playback starts automatically.
+Preferences live at `data/config.json`. Saved selections use a relative path such as `data/library`, so moving the folder needs no path edits. `--config PATH` can select another preferences file inside `data/`. AppData, XDG config folders, and the user's Music folder are not used. The library contains `music/`, `playlists/`, `.staging/`, and `library.sqlite3`; the initial database holds portable application state and creation metadata. Future migrations will add the song index and import records. It refuses a newer database schema and rolls back failed migrations. No playback starts automatically.
 
-Run the full checks after installation:
+Run the full checks after `python install.py --dev`, using `.venv/Scripts/python.exe` on Windows or `.venv/bin/python` on Linux/macOS in place of `python`:
 
 ```sh
 python -m pytest
 python -m ruff check .
 python -m ruff format --check .
-docker compose run --rm checks
+docker compose run --rm --build checks
 ```
 
-The Docker checks use the patch-pinned `python:3.13.16-slim-trixie` tooling image and the same dependency snapshots. Docker handles tests and tooling; native Windows will handle interactive audio. Linux mpv uses Unix sockets rather than Windows named pipes. Running playback inside WSL requires a separately verified audio setup and is not an initial acceptance requirement. Docker image build and execution remain unverified.
+Start Docker Desktop with Linux containers before running the Compose command. No local `.venv` is needed for Docker checks. The first build needs internet access to download the image and packages; checks run with container networking disabled. Rebuild after source changes because the image contains a copy of the project.
 
-The storage tests also work without third-party dependencies. They use temporary directories outside the repository and do not import user audio:
+The Docker checks use the digest-pinned `python:3.13.16-slim-trixie` tooling image. The build runs the same `python install.py --dev` setup, including `pip check`; the container runs pytest, Ruff linting, and Ruff formatting checks with its local `.venv`. Docker handles tests and tooling; native Windows will handle interactive audio. Linux mpv uses Unix sockets rather than Windows named pipes. Running playback inside WSL requires a separately verified audio setup and is not an initial acceptance requirement.
+
+To preview the starter interface in Docker with project-local data, run from PowerShell:
+
+```powershell
+docker compose run --rm -it --volume "${PWD}/data:/app/data" checks bxvzm
+```
+
+The bind mount preserves settings and the library in this folder's `data/` directory. Without that mount, application data exists only in the temporary container. Docker's images and cache are managed separately by Docker Desktop.
+
+The storage tests also work without third-party dependencies. They model portable bundles in temporary test directories and do not import user audio or touch the real `data/` folder:
 
 ```powershell
 $env:PYTHONPATH = "src"
@@ -147,6 +150,6 @@ $env:PYTHONPATH = "src"
 .\.venv\Scripts\python.exe -m bxvzm --help
 ```
 
-In Linux, use `PYTHONPATH=src python -m unittest discover -s tests -v`. The bootstrap run passed 18 tests and skipped two: the Textual check needs dependencies, and the symlink check needs OS permission. pytest collects the same tests once installed. To capture a terminal screenshot after installation, set `BXVZM_SCREENSHOT_DIR=tests/artifacts` and run `python -m pytest tests/test_ui.py`; the headless 80x24 check saves `foundation.svg` there.
+In Linux, use `PYTHONPATH=src python -m unittest discover -s tests -v`. Version 0.1.1 passes all 29 tests in Docker and 28 on Windows, with one Windows symlink-privilege skip. Both pass linting, formatting, and dependency checks. Fresh Linux setup and repeat Windows setup are verified; macOS has not been manually tested. Tests include bundle relocation, relative settings, external path rejection, UI navigation, and setup/recreation behavior. The terminal screenshot is [tests/artifacts/foundation.svg](tests/artifacts/foundation.svg). To regenerate it, set `BXVZM_SCREENSHOT_DIR=tests/artifacts` and run the UI test through the local environment's Python.
 
-The bootstrap environment could not reach PyPI (`WinError 10013`), access the Docker engine, or enumerate WSL distributions. Git is not available on PATH and this workspace has no `.git` directory. Resume with dependency installation and full validation, then continue to local indexing and playback in milestone 2.
+Local commands and Docker builds can require reviewed access outside the agent sandbox. Completed versions are committed and pushed to the configured remote after checks pass, without force-pushing. Git ignores local agent/planning files and user data. The next feature milestone is local indexing and playback.

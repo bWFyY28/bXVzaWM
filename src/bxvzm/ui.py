@@ -82,4 +82,3 @@ class MusicApp(App[None]):
 
     def action_help(self) -> None:
         self.push_screen(HelpScreen())
-

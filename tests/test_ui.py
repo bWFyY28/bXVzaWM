@@ -17,7 +17,9 @@ class InterfaceTests(unittest.IsolatedAsyncioTestCase):
         from bxvzm.ui import HelpScreen, MusicApp
 
         with tempfile.TemporaryDirectory() as directory:
-            layout = LibraryLayout.at(Path(directory) / "library")
+            layout = LibraryLayout.at(
+                Path(directory) / "data" / "library", app_root=Path(directory)
+            )
             app = MusicApp(layout)
             async with app.run_test(size=(80, 24)) as pilot:
                 self.assertEqual(app.query_one(TabbedContent).active, "library")
