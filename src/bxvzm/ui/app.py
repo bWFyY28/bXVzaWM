@@ -1,6 +1,7 @@
 """Text-first local music browser; disk I/O runs in a worker."""
 
 import sqlite3
+from pathlib import Path
 
 from rich.text import Text
 from textual import work
@@ -17,6 +18,7 @@ from bxvzm.library import LibraryLayout
 from bxvzm.metadata import Track
 from bxvzm.search import find_songs
 from bxvzm.service import request, start_service
+from bxvzm.ui.transfers import DownloadPanel, ImportPanel
 
 
 class HelpScreen(ModalScreen[None]):
@@ -41,7 +43,7 @@ class HelpScreen(ModalScreen[None]):
 
 class MusicApp(App[None]):
     TITLE = "bXVzaVM"
-    CSS_PATH = "themes/gruvbox.tcss"
+    CSS_PATH = Path(__file__).resolve().parents[1] / "themes/gruvbox.tcss"
     ENABLE_COMMAND_PALETTE = False
     AUTO_FOCUS = "#tracks"
     BINDINGS = [
@@ -100,7 +102,7 @@ class MusicApp(App[None]):
                 yield Static("Copy audio into music/, then press r to scan.", id="library-status")
                 yield Static(str(self.layout.music), id="library-root", markup=False)
             with TabPane("Search", id="search"):
-                yield Static("Catalog search arrives in milestone 3.", classes="empty-state")
+                yield DownloadPanel()
             with TabPane("Favorites", id="favorites"):
                 yield DataTable(id="favorite-tracks", cursor_type="row", zebra_stripes=False)
                 yield Static(
@@ -109,12 +111,14 @@ class MusicApp(App[None]):
             with TabPane("Playlists", id="playlists"):
                 yield Static("Playlist editing is upcoming.", classes="empty-state")
             with TabPane("Imports", id="imports"):
-                yield Static("Verified imports arrive in milestone 4.", classes="empty-state")
+                yield ImportPanel(self.store)
         yield Static("Stopped | No track loaded | Enter Play / Space Pause", id="player")
         yield Footer()
 
     def on_mount(self) -> None:
         for table in self.query(DataTable):
+            if table.id not in ("tracks", "favorite-tracks"):
+                continue
             table.add_columns(
                 "Fav", "Title", "Artist", "Album", "Disc/Track", "Time", "Format", "File"
             )
@@ -234,7 +238,12 @@ class MusicApp(App[None]):
             self._library_task("scan")
 
     def action_favorite(self) -> None:
-        if not self._busy and isinstance(self.focused, DataTable) and self.focused.row_count:
+        if (
+            not self._busy
+            and isinstance(self.focused, DataTable)
+            and self.focused.id in ("tracks", "favorite-tracks")
+            and self.focused.row_count
+        ):
             key = self.focused.coordinate_to_cell_key(self.focused.cursor_coordinate).row_key.value
             if key is not None:
                 self._busy = True

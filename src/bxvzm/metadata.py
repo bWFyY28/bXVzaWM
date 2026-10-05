@@ -29,7 +29,7 @@ class Track:
     available: bool = True
 
 
-def read_track(path: Path, relative_path: str) -> Track:
+def read_track(path: Path, relative_path: str, *, fallback_title: str | None = None) -> Track:
     """Read and hash source bytes without modifying tags or audio."""
     import mutagen
 
@@ -65,7 +65,7 @@ def read_track(path: Path, relative_path: str) -> Track:
     artist = text("artist", "Unknown artist", "TPE1")
     return Track(
         relative_path=relative_path,
-        title=text("title", path.stem, "TIT2"),
+        title=text("title", fallback_title or path.stem, "TIT2"),
         artist=artist,
         album=text("album", "Unknown album", "TALB"),
         album_artist=text("albumartist", artist, "TPE2"),

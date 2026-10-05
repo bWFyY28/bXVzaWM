@@ -32,6 +32,15 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "available INTEGER NOT NULL DEFAULT 1 CHECK (available IN (0, 1)))",
         "CREATE INDEX tracks_hash ON tracks (sha256)",
     ),
+    (
+        "CREATE TABLE import_jobs (job_id TEXT PRIMARY KEY, state TEXT NOT NULL "
+        "CHECK(state IN ('staging', 'review', 'committing', 'committed', 'failed', 'discarded')), "
+        "manifest_json TEXT NOT NULL, problem TEXT NOT NULL DEFAULT '', "
+        "created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))",
+        "CREATE TABLE import_files (job_id TEXT NOT NULL REFERENCES import_jobs(job_id), "
+        "relative_path TEXT NOT NULL REFERENCES tracks(relative_path), source_name TEXT NOT NULL, "
+        "sha256 TEXT NOT NULL, PRIMARY KEY(job_id, relative_path))",
+    ),
 )
 SCHEMA_VERSION = len(MIGRATIONS)
 
@@ -108,7 +117,11 @@ class LibraryStore:
                 raise ValueError("Track is no longer indexed")
 
     def replace_scan(
-        self, tracks: Sequence[Track], issues: list[dict[str, str]], duplicates: int
+        self,
+        tracks: Sequence[Track],
+        issues: list[dict[str, str]],
+        duplicates: int,
+        baseline: Sequence[str] | None = None,
     ) -> int:
         """Atomically refresh metadata; retain missing rows and user favorites."""
         for track in tracks:
@@ -120,7 +133,20 @@ class LibraryStore:
         assignments = ", ".join(f"{column}=excluded.{column}" for column in columns[1:])
         placeholders = ", ".join("?" for _ in columns)
         with closing(self._connect()) as connection, connection:
-            connection.execute("UPDATE tracks SET available = 0")
+            # A scan must not hide new imports committed after its traversal began.
+            if baseline is None:
+                connection.execute("UPDATE tracks SET available = 0")
+            else:
+                connection.executemany(
+                    "UPDATE tracks SET available = 0 WHERE relative_path = ?",
+                    [(path,) for path in baseline],
+                )
+            pending = self._pending_import_roots(connection)
+            tracks = [
+                track
+                for track in tracks
+                if not any(track.relative_path.startswith(root + "/") for root in pending)
+            ]
             connection.executemany(
                 f"INSERT INTO tracks ({', '.join(columns)}) VALUES ({placeholders}) "
                 f"ON CONFLICT(relative_path) DO UPDATE SET {assignments}",
@@ -135,3 +161,110 @@ class LibraryStore:
                 (json.dumps({"issues": issues, "duplicate_files": duplicates}),),
             )
         return missing
+
+    def create_import(self, job_id: str, manifest: dict) -> None:
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                "INSERT INTO import_jobs(job_id, state, manifest_json) VALUES (?, 'staging', ?)",
+                (job_id, json.dumps(manifest, ensure_ascii=False, allow_nan=False)),
+            )
+
+    def get_import(self, job_id: str) -> dict:
+        with closing(self._connect()) as connection:
+            connection.row_factory = sqlite3.Row
+            row = connection.execute(
+                "SELECT * FROM import_jobs WHERE job_id = ?", (job_id,)
+            ).fetchone()
+        if row is None:
+            raise ValueError("Unknown import job; use --imports to list full job IDs")
+        result = dict(row)
+        result["manifest"] = json.loads(result.pop("manifest_json"))
+        return result
+
+    def list_imports(self) -> list[dict]:
+        with closing(self._connect()) as connection:
+            ids = connection.execute(
+                "SELECT job_id FROM import_jobs ORDER BY created_at DESC, job_id"
+            ).fetchall()
+        return [self.get_import(row[0]) for row in ids]
+
+    def update_import(
+        self,
+        job_id: str,
+        state: str,
+        manifest: dict,
+        problem: str = "",
+        *,
+        expected_state: str | None = None,
+    ) -> bool:
+        with closing(self._connect()) as connection, connection:
+            cursor = connection.execute(
+                "UPDATE import_jobs SET state=?, manifest_json=?, problem=? WHERE job_id=? "
+                "AND (? IS NULL OR state=?)",
+                (
+                    state,
+                    json.dumps(manifest, ensure_ascii=False, allow_nan=False),
+                    problem,
+                    job_id,
+                    expected_state,
+                    expected_state,
+                ),
+            )
+            return bool(cursor.rowcount)
+
+    def pending_import_roots(self) -> list[str]:
+        with closing(self._connect()) as connection:
+            return self._pending_import_roots(connection)
+
+    def import_source_names(self) -> dict[str, str]:
+        with closing(self._connect()) as connection:
+            return dict(connection.execute("SELECT relative_path, source_name FROM import_files"))
+
+    @staticmethod
+    def _pending_import_roots(connection: sqlite3.Connection) -> list[str]:
+        rows = connection.execute(
+            "SELECT manifest_json FROM import_jobs WHERE state = 'committing'"
+        ).fetchall()
+        return [json.loads(row[0])["destination"] for row in rows]
+
+    def commit_import(self, job_id: str, tracks: list[Track]) -> int:
+        """Serialize acceptance and atomically publish the index and import history.
+
+        Files are prepared under the import OS lock before this short transaction.
+        A crash after their directory move leaves a journal for repeat acceptance.
+        """
+        with closing(self._connect()) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    "SELECT state, manifest_json FROM import_jobs WHERE job_id=?", (job_id,)
+                ).fetchone()
+                if row is None or row[0] not in ("committing", "committed"):
+                    raise ValueError("Import is not ready for acceptance")
+                if row[0] == "committed":
+                    connection.rollback()
+                    return connection.execute(
+                        "SELECT count(*) FROM import_files WHERE job_id=?", (job_id,)
+                    ).fetchone()[0]
+                manifest = json.loads(row[1])
+                columns = tuple(Track.__dataclass_fields__)
+                for track, file in zip(tracks, manifest["files"], strict=True):
+                    self.layout.resolve_relative(track.relative_path)
+                    record = asdict(track)
+                    connection.execute(
+                        f"INSERT INTO tracks ({', '.join(columns)}) "
+                        f"VALUES ({', '.join('?' for _ in columns)})",
+                        tuple(record[column] for column in columns),
+                    )
+                    connection.execute(
+                        "INSERT INTO import_files VALUES (?, ?, ?, ?)",
+                        (job_id, track.relative_path, file["source_name"], track.sha256),
+                    )
+                connection.execute(
+                    "UPDATE import_jobs SET state='committed', problem='' WHERE job_id=?", (job_id,)
+                )
+                connection.commit()
+                return len(tracks)
+            except BaseException:
+                connection.rollback()
+                raise

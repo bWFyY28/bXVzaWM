@@ -15,6 +15,8 @@ from bxvzm.library import LibraryLayout
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="bXVzaVM local music library")
     parser.add_argument("--version", action="version", version=f"bXVzaVM {__version__}")
+    parser.add_argument("command", nargs="?", choices=("open",), help="open the interface")
+    parser.add_argument("view", nargs="?", choices=("tui",), help="terminal interface")
     parser.add_argument(
         "--library", type=Path, help="select a library inside the bundle's data folder"
     )
@@ -34,6 +36,33 @@ def build_parser() -> argparse.ArgumentParser:
     actions.add_argument("--stop-service", action="store_true", help="exit the background service")
     actions.add_argument("--pause", action="store_true", help="toggle background play/pause")
     actions.add_argument("--serve", action="store_true", help=argparse.SUPPRESS)
+    actions.add_argument("--download", metavar="URL", help="prepare a manual DoubleDouble handoff")
+    actions.add_argument(
+        "--import",
+        dest="import_source",
+        type=Path,
+        metavar="PATH",
+        help="stage a downloaded ZIP, audio file, or folder for review",
+    )
+    actions.add_argument("--imports", action="store_true", help="list import jobs and their states")
+    actions.add_argument(
+        "--review-import", metavar="JOB", help="show a staged import's files/evidence"
+    )
+    actions.add_argument("--accept-import", metavar="JOB", help="accept or resume an import")
+    actions.add_argument(
+        "--discard-import", metavar="JOB", help="discard an uncommitted staged job"
+    )
+    parser.add_argument(
+        "--open-browser", action="store_true", help="open DoubleDouble with --download"
+    )
+    parser.add_argument(
+        "--source-url", default="", metavar="URL", help="record provider evidence with --import"
+    )
+    parser.add_argument(
+        "--accept-unverified",
+        action="store_true",
+        help="explicitly accept unknown completeness/edition",
+    )
     parser.add_argument("--match", type=int, metavar="N", help="play candidate N for --song")
     return parser
 
@@ -43,13 +72,33 @@ def main(argv: Sequence[str] | None = None) -> int:
     service_action = any(
         (args.song is not None, args.daemon, args.status, args.stop_service, args.pause, args.serve)
     )
-    if (args.check or args.scan) and service_action:
-        build_parser().error("--check/--scan cannot be combined with playback/service commands")
+    transfer_action = any(
+        (
+            args.download is not None,
+            args.import_source is not None,
+            args.imports,
+            args.review_import,
+            args.accept_import,
+            args.discard_import,
+        )
+    )
+    if args.command and (
+        args.view != "tui" or service_action or transfer_action or args.check or args.scan
+    ):
+        build_parser().error("use 'open tui' without another action")
+    if (args.check or args.scan) and (service_action or transfer_action):
+        build_parser().error("--check/--scan cannot be combined with other actions")
+    if args.open_browser and args.download is None:
+        build_parser().error("--open-browser requires --download")
+    if args.source_url and args.import_source is None:
+        build_parser().error("--source-url requires --import")
+    if args.accept_unverified and args.accept_import is None:
+        build_parser().error("--accept-unverified requires --accept-import")
     if args.match is not None and (args.song is None or not 1 <= args.match <= 5):
         build_parser().error("--match requires --song and a candidate number from 1 to 5")
     try:
         # Import before touching user data if the interactive dependencies are missing.
-        if not args.check and not args.scan and not service_action:
+        if not args.check and not args.scan and not service_action and not transfer_action:
             from bxvzm.ui import MusicApp
 
         settings = load_settings(args.library, args.config)
@@ -58,7 +107,52 @@ def main(argv: Sequence[str] | None = None) -> int:
         schema = store.initialize()
         if args.library is not None and not args.serve:
             save_settings(settings)
-        if service_action:
+        if transfer_action:
+            from bxvzm.transfers.imports import accept_import, discard_import, stage_import
+            from bxvzm.transfers.links import (
+                DOUBLEDOUBLE_URL,
+                open_download_page,
+                validate_provider_url,
+            )
+
+            if args.download is not None:
+                link = validate_provider_url(args.download)
+                print(
+                    f"{link.provider} {link.kind}: {link.url}\n"
+                    f"Open {DOUBLEDOUBLE_URL}, paste this URL, and download manually.\n"
+                    "Then use --import PATH to stage the downloaded audio."
+                )
+                if args.open_browser:
+                    open_download_page(link)
+            elif args.import_source is not None:
+                job = stage_import(store, args.import_source, args.source_url)
+                print(
+                    f"Import staged: {job['job_id']}\n"
+                    f"Files: {len(job['manifest']['files'])}\n"
+                    "Completeness: unknown | Edition: unknown\n"
+                    f"Review with --review-import {job['job_id']}"
+                )
+            elif args.imports:
+                for job in store.list_imports():
+                    print(
+                        f"{job['job_id']} | {job['state']} | "
+                        f"{len(job['manifest']['files'])} files | {job['manifest']['source']}"
+                    )
+            elif args.review_import:
+                import json
+
+                print(
+                    json.dumps(store.get_import(args.review_import), indent=2, ensure_ascii=False)
+                )
+            elif args.accept_import:
+                count = accept_import(
+                    store, args.accept_import, accept_unverified=args.accept_unverified
+                )
+                print(f"Accepted {count} files as unverified. No source files were removed.")
+            else:
+                discard_import(store, args.discard_import)
+                print("Staged import discarded. Original source files were preserved.")
+        elif service_action:
             from bxvzm.service import request, serve, start_service
 
             if args.serve:

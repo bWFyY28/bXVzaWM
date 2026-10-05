@@ -1,0 +1,13 @@
+*
+!docker/
+!docker/Dockerfile
+!requirements/
+!requirements/*.txt
+!src/
+!src/**
+!pyproject.toml
+!README.md
+!install.py
+!run.py
+**/__pycache__/
+**/*.pyc

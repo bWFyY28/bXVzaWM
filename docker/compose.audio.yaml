@@ -1,0 +1,5 @@
+# Native Linux hosts only. Docker Desktop does not expose Windows sound devices.
+services:
+  app:
+    devices:
+      - /dev/snd:/dev/snd
