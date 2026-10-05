@@ -1,0 +1,65 @@
+Screen {
+    background: #282828;
+    color: #d4be98;
+}
+
+Header, Footer {
+    background: #32302f;
+    color: #d4be98;
+}
+
+#views {
+    height: 1fr;
+    margin: 0 1;
+}
+
+TabPane {
+    border: solid #504945;
+    padding: 1 2;
+}
+
+Tabs:focus-within {
+    border-bottom: solid #7daea3;
+}
+
+Tab.-active {
+    color: #7daea3;
+    text-style: bold;
+}
+
+Underline > .underline--bar {
+    color: #7daea3;
+}
+
+.empty-state {
+    height: auto;
+    margin-bottom: 1;
+}
+
+#library-root {
+    color: #a89984;
+    height: auto;
+    overflow-x: auto;
+}
+
+#player {
+    height: 3;
+    margin: 0 1;
+    padding: 0 1;
+    border: solid #7daea3;
+    background: #32302f;
+}
+
+HelpScreen {
+    align: center middle;
+    background: #282828 85%;
+}
+
+#help-dialog {
+    width: 52;
+    height: auto;
+    padding: 1 2;
+    border: solid #7daea3;
+    background: #32302f;
+}
+

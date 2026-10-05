@@ -1,0 +1,4 @@
+# Packaging tools are separate from runtime dependencies.
+setuptools==80.9.0
+wheel==0.45.1
+

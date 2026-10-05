@@ -1,0 +1,46 @@
+# Local agent instructions and planning artifacts, including nested copies
+AGENTS.md
+PLAN.md
+*.plan.md
+.agents/
+.codex/
+.planning/
+plans/
+
+# Environments and tooling
+.venv/
+.python/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Credentials and machine preferences
+.env
+.env.*
+!.env.example
+credentials*.json
+config.local.json
+
+# User media, library databases, and unfinished imports
+*.sqlite3
+*.sqlite3-*
+*.sqlite
+*.db
+*.db-*
+*.mp3
+*.flac
+*.m4a
+*.aac
+*.ogg
+*.opus
+*.wav
+*.zip
+music/
+playlists/
+.staging/
